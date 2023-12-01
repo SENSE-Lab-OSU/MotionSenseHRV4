@@ -22,28 +22,34 @@ FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 #define STORAGE_PARTITION		storage_partition
 #define STORAGE_PARTITION_ID		FIXED_PARTITION_ID(STORAGE_PARTITION)
 
-
+// internally linked globals
 static struct fs_mount_t fs_mnt;
+//counter to serve as a amount for when the file fills up.
+static int data_counter;
 
-
-void create_test_files(struct fs_mount_t* mp){
+void create_test_files(){
 	printk("trying to write files...\n");
 	struct fs_file_t test_file;
 	fs_file_t_init(&test_file);
 	char destination[50] = "";
+	struct fs_mount_t* mp = &fs_mnt;
 	strcat(destination, mp->mnt_point);
-	strcat(destination, "/test");
+	strcat(destination, "/test.txt");
 	printk("file: %s \n", mp->mnt_point); 
 	int file_create = fs_open(&test_file, destination, FS_O_CREATE | FS_O_WRITE);
 	if (file_create == 0){
-		int a = 0;
+		int a[] = "hello world";
 		printk("trying to write...\n");
-		fs_write(&test_file, &a, sizeof(&a));
+		fs_write(&test_file, a, sizeof(a));
 		printk("done writing\n");
 		fs_close(&test_file);
 	}
 }
 
+void write_to_file(const char* file_name, const void* data, size_t size){
+
+
+}
 
 
 
