@@ -8,8 +8,10 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/usb/usb_device.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "filesystem/zephyrfilesystem.h"
 
+#define RAND_MAX 64
 LOG_MODULE_REGISTER(main);
 
 int64_t start_time;
@@ -20,7 +22,7 @@ void start_timer(){
 
 
 int64_t stop_timer(){
-	int64_t length = k_uptime_get - start_time;
+	int64_t length = k_uptime_get() - start_time;
 	start_time = 0;
 	return length;
 }
@@ -28,20 +30,32 @@ int64_t stop_timer(){
 
 void main(void)
 {
+
+	int test_data[100] = {1, 2, 4, 5, 6, };
 	int ret;
-
+	
 	setup_disk();
-
 	printk("disk setup complete!\n");
 	k_sleep(K_SECONDS(2));
-	printk("now attempting to create test files..\n");
-	create_test_files();
+	//create_test_files();
+	write_to_file(test_data, sizeof(test_data));
+	int k = 0;
+	start_timer();
+	for (int x = 0; x < 100; x++){
+		write_to_file(test_data, sizeof(test_data));
+	}
 
+	close_all_files();
+	uint64_t total_time = stop_timer();
+	printk("time: %llu \n", total_time);
+
+	
 	ret = usb_enable(NULL);
 	if (ret != 0) {
 		LOG_ERR("Failed to enable USB");
 		return;
 	}
+	printk("%i \n", k);
 	LOG_INF("Main Mass Application\n");
 	LOG_INF("The device is put in USB mass storage mode.\n");
 }

@@ -22,10 +22,28 @@ FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 #define STORAGE_PARTITION		storage_partition
 #define STORAGE_PARTITION_ID		FIXED_PARTITION_ID(STORAGE_PARTITION)
 
+//data limit per file in bytes
+static int data_limit = 5000;
+
 // internally linked globals
 static struct fs_mount_t fs_mnt;
 //counter to serve as a amount for when the file fills up.
 static int data_counter;
+char file_name[50] = "";
+static bool first_write = false;
+static struct fs_file_t file;
+
+
+typedef struct MotionSenseFile {
+	int data_counter;
+	char file_name[50];
+	struct fs_file_t self_file;
+	bool first_write;
+} 	MotionSenseFile;
+
+static int current_file_count;
+
+
 
 void create_test_files(){
 	printk("trying to write files...\n");
@@ -34,11 +52,10 @@ void create_test_files(){
 	char destination[50] = "";
 	struct fs_mount_t* mp = &fs_mnt;
 	strcat(destination, mp->mnt_point);
-	strcat(destination, "/test.txt");
-	printk("file: %s \n", mp->mnt_point); 
+	strcat(destination, "/test.txt"); 
 	int file_create = fs_open(&test_file, destination, FS_O_CREATE | FS_O_WRITE);
 	if (file_create == 0){
-		int a[] = "hello world";
+		char a[] = "hello world";
 		printk("trying to write...\n");
 		fs_write(&test_file, a, sizeof(a));
 		printk("done writing\n");
@@ -46,11 +63,39 @@ void create_test_files(){
 	}
 }
 
-void write_to_file(const char* file_name, const void* data, size_t size){
 
 
+void write_to_file(const void* data, size_t size){
+	struct fs_mount_t* mp = &fs_mnt;
+	if (!first_write ){
+		
+		fs_file_t_init(&file);
+		strcat(file_name, mp->mnt_point);
+		strcat(file_name, "/test.txt");
+		printk("file: %s \n", file_name); 
+		int file_create = fs_open(&file, file_name, FS_O_CREATE | FS_O_WRITE);
+		first_write = true;
+
+	}
+	else if (data_counter >= data_limit){
+		memset(file_name, 0, sizeof(file_name));
+		data_counter = 0;
+	}
+	
+	int total_written = fs_write(&file, data, size);
+	//fs_write(&file, data, size);
+	if (total_written = size){
+		//printk("sucessfully wrote file, bytes written = %i ! \n", total_written);
+		data_counter += total_written;
+	}
 }
 
+int close_all_files(){
+
+	int code = fs_close(&file);
+	return code;
+
+}
 
 
 static int setup_flash(struct fs_mount_t *mnt)
