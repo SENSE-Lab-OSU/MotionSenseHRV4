@@ -8,7 +8,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/usb/usb_device.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <zephyr/random/rand32.h>
 #include "filesystem/zephyrfilesystem.h"
 
 #define RAND_MAX 64
@@ -31,9 +31,13 @@ int64_t stop_timer(){
 void main(void)
 {
 
-	int test_data[100] = {1, 2, 4, 5, 6, };
+	int test_data[1000] = {1, 2, 4, 5, 6, };
 	int ret;
-	
+	for (int counter = 0; counter < sizeof(test_data)/sizeof(int); counter++){
+		test_data[counter] = sys_rand32_get() % 10000;
+	}
+
+
 	setup_disk();
 	printk("disk setup complete!\n");
 	k_sleep(K_SECONDS(2));
@@ -41,16 +45,16 @@ void main(void)
 	write_to_file(test_data, sizeof(test_data));
 	int k = 0;
 	start_timer();
-	for (int x = 0; x < 100; x++){
+	for (int x = 0; x < 10; x++){
 		write_to_file(test_data, sizeof(test_data));
 	}
 
-	close_all_files();
+	
 	uint64_t total_time = stop_timer();
 	printk("time: %llu \n", total_time);
-
-	
+	close_all_files();
 	ret = usb_enable(NULL);
+	
 	if (ret != 0) {
 		LOG_ERR("Failed to enable USB");
 		return;

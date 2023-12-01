@@ -1,6 +1,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/fs/fs.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/random/rand32.h>
 #include "zephyrfilesystem.h"
 
 
@@ -25,6 +26,18 @@ FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 //data limit per file in bytes
 static int data_limit = 5000;
 
+
+
+
+char data_upload_buffer[100];
+// settings
+
+bool use_random_files = false;
+bool direct_write_file = true; 
+
+
+
+
 // internally linked globals
 static struct fs_mount_t fs_mnt;
 //counter to serve as a amount for when the file fills up.
@@ -40,6 +53,9 @@ typedef struct MotionSenseFile {
 	struct fs_file_t self_file;
 	bool first_write;
 } 	MotionSenseFile;
+
+
+static MotionSenseFile current_file;
 
 static int current_file_count;
 
@@ -70,15 +86,35 @@ void write_to_file(const void* data, size_t size){
 	if (!first_write ){
 		
 		fs_file_t_init(&file);
+		
+		
+		int ID = 0;
+		char IDString[5];
+		if (use_random_files){
+			
+		
+			ID = sys_rand32_get() % 900;
+			
+		}
+		else {
+			ID = 1;
+
+		}
+		itoa(ID, IDString,  10);
+
+
+
 		strcat(file_name, mp->mnt_point);
-		strcat(file_name, "/test.txt");
+		strcat(file_name, "/");
+		strcat(file_name, IDString);
+		strcat(file_name, "test.txt");
 		printk("file: %s \n", file_name); 
 		int file_create = fs_open(&file, file_name, FS_O_CREATE | FS_O_WRITE);
 		first_write = true;
 
 	}
 	else if (data_counter >= data_limit){
-		memset(file_name, 0, sizeof(file_name));
+		//memset(file_name, 0, sizeof(file_name));
 		data_counter = 0;
 	}
 	
