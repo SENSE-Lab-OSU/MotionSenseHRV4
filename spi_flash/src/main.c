@@ -27,6 +27,7 @@
 #endif
 #define SPI_FLASH_SECTOR_SIZE        4096
 
+
 void main(void)
 {
 	const uint8_t expected[] = { 0x55, 0xaa, 0x66, 0x99 };
@@ -48,10 +49,13 @@ void main(void)
 		return;
 	}
 
+
+
 	printf("\n%s SPI flash testing\n", flash_dev->name);
 	printf("==========================\n");
+	k_sleep(K_MSEC(500));
 
-
+	
 	/* Write protection needs to be disabled before each write or
 	 * erase, since the flash component turns on write protection
 	 * automatically after completion of write and erase
@@ -72,6 +76,8 @@ void main(void)
 	}
 
 	printf("\nTest 2: Flash write\n");
+
+	
 
 	printf("Attempting to write %zu bytes\n", len);
 	rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);

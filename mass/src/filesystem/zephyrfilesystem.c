@@ -2,6 +2,7 @@
 #include <zephyr/fs/fs.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/random/rand32.h>
+#include <stdlib.h>
 #include "zephyrfilesystem.h"
 
 
@@ -24,15 +25,26 @@ FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 #define STORAGE_PARTITION_ID		FIXED_PARTITION_ID(STORAGE_PARTITION)
 
 //data limit per file in bytes
-static int data_limit = 5000;
+static int data_limit = 500;
 
 
 
+typedef struct memory_container {
+	void* address;
+	size_t size;
+	struct k_work work;
 
-char data_upload_buffer[100];
+} memory_container;
+
+
+typedef struct data_upload_buffer {
+	char data_upload_buffer[500];
+	size_t current_size;
+} data_upload_buffer;
+
+
 // settings
-
-bool use_random_files = false;
+bool use_random_files = true;
 bool direct_write_file = true; 
 
 
@@ -80,7 +92,6 @@ void create_test_files(){
 }
 
 
-
 void write_to_file(const void* data, size_t size){
 	struct fs_mount_t* mp = &fs_mnt;
 	if (!first_write ){
@@ -125,6 +136,30 @@ void write_to_file(const void* data, size_t size){
 		data_counter += total_written;
 	}
 }
+
+
+
+
+
+void work_write(struct k_work* item){
+	
+	memory_container* container =
+        CONTAINER_OF(item, memory_container, work);
+	write_to_file(container->address, container->size);
+
+}
+
+void submit_write(const void* data, size_t size){
+	memory_container work_item;
+	work_item.address = data;
+	work_item.size = size;
+
+	k_work_init(&work_item.work, work_write);
+	k_work_submit(&work_item.work);
+
+}
+
+
 
 int close_all_files(){
 

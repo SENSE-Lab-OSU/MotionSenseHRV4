@@ -11,10 +11,15 @@
 #include <zephyr/random/rand32.h>
 #include "filesystem/zephyrfilesystem.h"
 
+
+int a = -890;
+
 #define RAND_MAX 64
 LOG_MODULE_REGISTER(main);
 
 int64_t start_time;
+
+
 
 void start_timer(){
 	start_time = k_uptime_get();
@@ -28,25 +33,25 @@ int64_t stop_timer(){
 }
 
 
+
 void main(void)
 {
-
-	int test_data[1000] = {1, 2, 4, 5, 6, };
+	
+	setup_disk();
+	printk("disk setup complete!\n");
+	int test_data[10000] = {1, 2, 4, 5, 6, };
 	int ret;
 	for (int counter = 0; counter < sizeof(test_data)/sizeof(int); counter++){
 		test_data[counter] = sys_rand32_get() % 10000;
 	}
-
-
-	setup_disk();
-	printk("disk setup complete!\n");
 	k_sleep(K_SECONDS(2));
 	//create_test_files();
 	write_to_file(test_data, sizeof(test_data));
 	int k = 0;
 	start_timer();
-	for (int x = 0; x < 10; x++){
-		write_to_file(test_data, sizeof(test_data));
+	for (int x = 0; x < 1; x++){
+		//write_to_file(test_data, sizeof(test_data));
+		submit_write(test_data, sizeof(test_data));
 	}
 
 	
