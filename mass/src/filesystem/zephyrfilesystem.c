@@ -69,6 +69,10 @@ typedef struct MotionSenseFile {
 
 static MotionSenseFile current_file;
 
+MotionSenseFile ppg_file;
+
+MotionSenseFile accel_file;
+
 static int current_file_count;
 
 
@@ -88,6 +92,62 @@ void create_test_files(){
 		fs_write(&test_file, a, sizeof(a));
 		printk("done writing\n");
 		fs_close(&test_file);
+	}
+}
+
+
+void sensor_write_to_file(const void* data, size_t size, enum sensor_type sensor){
+	struct fs_mount_t* mp = &fs_mnt;
+	MotionSenseFile* MSenseFile;
+
+	if (sensor == ppg){
+		MSenseFile = &ppg_file;
+	}
+	else if (sensor == accelorometer){
+		MSenseFile = &accel_file;
+	}
+
+
+	if (!MSenseFile->first_write){
+		
+		fs_file_t_init(&MSenseFile->self_file);
+		
+		
+		int ID = 0;
+		char IDString[5];
+		if (use_random_files){
+			
+		
+			ID = sys_rand32_get() % 900;
+			
+		}
+		else {
+			ID = 1;
+
+		}
+		itoa(ID, IDString,  10);
+
+
+
+		strcat(MSenseFile->file_name, mp->mnt_point);
+		strcat(MSenseFile->file_name, "/");
+		strcat(MSenseFile->file_name, IDString);
+		strcat(MSenseFile->file_name, "test.txt");
+		//printk("file: %s \n", file_name); 
+		int file_create = fs_open(&MSenseFile->self_file, MSenseFile->file_name, FS_O_CREATE | FS_O_WRITE);
+		first_write = true;
+
+	}
+	else if (data_counter >= data_limit){
+		//memset(file_name, 0, sizeof(file_name));
+		data_counter = 0;
+	}
+	
+	int total_written = fs_write(&MSenseFile->self_file, data, size);
+	//fs_write(&file, data, size);
+	if (total_written = size){
+		//printk("sucessfully wrote file, bytes written = %i ! \n", total_written);
+		data_counter += total_written;
 	}
 }
 
@@ -119,7 +179,7 @@ void write_to_file(const void* data, size_t size){
 		strcat(file_name, "/");
 		strcat(file_name, IDString);
 		strcat(file_name, "test.txt");
-		printk("file: %s \n", file_name); 
+		//printk("file: %s \n", file_name); 
 		int file_create = fs_open(&file, file_name, FS_O_CREATE | FS_O_WRITE);
 		first_write = true;
 
@@ -136,7 +196,6 @@ void write_to_file(const void* data, size_t size){
 		data_counter += total_written;
 	}
 }
-
 
 
 

@@ -39,7 +39,7 @@ void main(void)
 	
 	setup_disk();
 	printk("disk setup complete!\n");
-	int test_data[10000] = {1, 2, 4, 5, 6, };
+	int test_data[50000] = {1, 2, 4, 5, 6, };
 	int ret;
 	for (int counter = 0; counter < sizeof(test_data)/sizeof(int); counter++){
 		test_data[counter] = sys_rand32_get() % 10000;
@@ -50,8 +50,8 @@ void main(void)
 	int k = 0;
 	start_timer();
 	for (int x = 0; x < 1; x++){
-		//write_to_file(test_data, sizeof(test_data));
-		submit_write(test_data, sizeof(test_data));
+		write_to_file(test_data, sizeof(test_data));
+		//submit_write(test_data, sizeof(test_data));
 	}
 
 	
