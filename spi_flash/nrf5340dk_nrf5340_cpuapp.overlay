@@ -16,8 +16,14 @@
 /delete-node/ &storage_partition;
 
 
+
+&spi3 {
+	status = "okay";
+};
+
+
  &qspi {
-	 status = "okay";
+	 status = "disabled";
 	 pinctrl-0 = <&qspi_default>;
 	 pinctrl-1 = <&qspi_sleep>;
 	 pinctrl-names = "default", "sleep";

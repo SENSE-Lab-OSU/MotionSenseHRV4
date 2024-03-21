@@ -451,9 +451,9 @@ static void qspi_handler(nrfx_qspi_evt_t event, void *p_context)
 	}
 }
 
-static int qspi_device_init(const struct device *dev)
+static int qspi_device_init(const struct device* dev)
 {
-	struct qspi_nor_data *dev_data = dev->data;
+	struct qspi_nor_data* dev_data = dev->data;
 
 	if (dev_data->xip_enabled) {
 		return 0;
@@ -1526,7 +1526,8 @@ static int qspi_init(const struct device *dev)
 
 	IRQ_CONNECT(DT_IRQN(QSPI_NODE), DT_IRQ(QSPI_NODE, priority),
 		    nrfx_isr, nrfx_qspi_irq_handler, 0);
-	return qspi_nor_configure(dev);
+	qspi_nor_configure(dev);
+	return;
 }
 
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
