@@ -13,6 +13,7 @@
 #include <zephyr/drivers/flash/nrf_qspi_nor.h>
 #include <stdio.h>
 #include <string.h>
+void test_cmd();
 
 #if defined(CONFIG_BOARD_ADAFRUIT_FEATHER_STM32F405)
 #define SPI_FLASH_TEST_REGION_OFFSET 0xf000
@@ -32,7 +33,7 @@
 
 void main(void)
 {
-	
+	//test_cmd();
 	uint8_t expected[120];
 	for (int i = 0; i < sizeof(expected); i++){
 		expected[i] = i % 9;
