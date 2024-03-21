@@ -476,7 +476,7 @@ static int qspi_device_init(const struct device *dev)
 #endif
 
 	if (!qspi_initialized) {
-		const struct qspi_nor_config *dev_config = dev->config;
+		const struct qspi_nor_config* dev_config = dev->config;
 
 		res = nrfx_qspi_init(&dev_config->nrfx_cfg,
 				     qspi_handler,
