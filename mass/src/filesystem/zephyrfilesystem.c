@@ -24,9 +24,11 @@ FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 #define STORAGE_PARTITION		storage_partition
 #define STORAGE_PARTITION_ID		FIXED_PARTITION_ID(STORAGE_PARTITION)
 
-//data limit per file in bytes
-static int data_limit = 500;
+#define GLOBAL_BUFFER_SIZE 500
 
+//data limit per file in bytes
+static int data_limit = GLOBAL_BUFFER_SIZE;
+static int create_newfile_limit = 500;
 
 
 typedef struct memory_container {
@@ -37,8 +39,10 @@ typedef struct memory_container {
 } memory_container;
 
 
+
+
 typedef struct data_upload_buffer {
-	char data_upload_buffer[500];
+	char data_upload_buffer[GLOBAL_BUFFER_SIZE];
 	size_t current_size;
 } data_upload_buffer;
 
@@ -64,9 +68,12 @@ typedef struct MotionSenseFile {
 	char file_name[50];
 	struct fs_file_t self_file;
 	bool first_write;
+	data_upload_buffer buffer;
 } 	MotionSenseFile;
 
 
+
+//File Objects
 static MotionSenseFile current_file;
 
 MotionSenseFile ppg_file;
@@ -311,7 +318,6 @@ void setup_disk(void)
 		LOG_ERR("Failed to mount filesystem");
 		return;
 	}
-
 	/* Allow log messages to flush to avoid interleaved output */
 	k_sleep(K_MSEC(50));
 
@@ -358,3 +364,4 @@ void setup_disk(void)
 
 	return;
 }
+

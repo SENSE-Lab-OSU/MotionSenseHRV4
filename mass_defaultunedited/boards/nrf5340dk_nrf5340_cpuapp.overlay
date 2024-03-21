@@ -1,8 +1,231 @@
-/*
- * Copyright (c) 2020 Nordic Semiconductor ASA
- *
- * SPDX-License-Identifier: Apache-2.0
- */
+// press Ctrl+Space to bring up the completion menu and view the available nodes.
+
+// You can also use the buttons in the sidebar to perform actions on nodes.
+// Actions currently available include:
+
+// * Enabling / disabling the node
+// * Adding the bus to a bus
+// * Removing the node
+// * Connecting ADC channels
+
+// For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
+// You can also visit the nRF DeviceTree extension documentation at https://nrfconnect.github.io/vscode-nrf-connect/devicetree/nrfdevicetree.html
+
+
+&timer0 {
+    status = "okay";
+};
+
+&timer1 {
+    status = "okay";
+};
+
+
+&led0 {
+    status = "okay";
+};
+
+
+&arduino_adc {
+    io-channel-map = <0 &adc 0>, <1 &adc 1>, <2 &adc 2>, <3 &adc 3>, <4 &adc 4>, <5 &adc 5>;
+};
+
+
+/ {
+    aliases {
+        customspi = &spi1;
+		spi-flash0 = &mx25r64;
+    };
+};
+
+
+
+
+
+
+
+
+
+
+&spi2 {
+compatible = "nordic,nrf-spim";
+	status = "okay";
+	cs-gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
+	pinctrl-0 = <&spi1_default>;
+	pinctrl-1 = <&spi1_sleep>;
+	pinctrl-names = "default", "sleep";
+
+};
+
+// We need to disable i2c1, since we are already using spi1 and it is no longer needed (can't have 2 devices on the same unit).
+&i2c1 {
+	status = "okay";
+	compatible = "nordic,nrf-twim";
+};
+
+/* 
+&i2c0 {
+	status = "okay";
+	compatible = "nordic,nrf-twim";
+	pinctrl-0 = < &i2c1_default>;
+	pinctrl-1 = <&i2c1_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+*/
+
+//uart cannot also be in operation, however, this means we have to use segger RTT, because uart is used for console output
+&uart0 {
+	status = "okay";
+};
+
+
+  
+&spi3{
+	compatible = "nordic,nrf-spim";
+	status = "okay";
+	cs-gpios = <&gpio1 5 1>;
+	pinctrl-0 = < &ppg_default>;
+	pinctrl-1 = <&ppg_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+
+//External Flash
+/* 
+&mx66u: mx66u2g45g@0{
+	compatible = "nordic,qspi-nor";
+	reg = <0>;
+	
+	writeoc = "pp4io";
+	readoc = "read4io";
+	sck-frequency = <8000000>;
+	jedec-id = [c2 25 3c];
+	sfdp-bfp = [
+		e5 20 f1 ff  ff ff ff 03  44 eb 08 6b  08 3b 04 bb
+		ee ff ff ff  ff ff 00 ff  ff ff 00 ff  0c 20 0f 52
+		10 d8 00 ff  23 72 f5 00  82 ed 04 cc  44 83 68 44
+		30 b0 30 b0  f7 c4 d5 5c  00 be 29 ff  f0 d0 ff ff
+	];
+	size = <67108864>;
+	has-dpd;
+	t-enter-dpd = <10000>;
+	t-exit-dpd = <35000>;
+	
+}; 
+
+*/
+
+ /* 
+&qspi {
+	status = "okay";
+	pinctrl-0 = <&qspi_default>;
+	pinctrl-1 = <&qspi_sleep>;
+	pinctrl-names = "default", "sleep";
+	mx25r6435f@0 {
+		compatible = "nordic,qspi-nor";
+	reg = <0>;
+	writeoc = "pp";
+	readoc = "fastread";
+	sck-frequency = <8000000>;
+	jedec-id = [c2 25 3c];
+	sfdp-bfp = [
+		e5 20 f1 ff  ff ff ff 03  44 eb 08 6b  08 3b 04 bb
+		ee ff ff ff  ff ff 00 ff  ff ff 00 ff  0c 20 0f 52
+		10 d8 00 ff  23 72 f5 00  82 ed 04 cc  44 83 68 44
+		30 b0 30 b0  f7 c4 d5 5c  00 be 29 ff  f0 d0 ff ff
+	];
+	size = <67108864>;
+	has-dpd;
+	t-enter-dpd = <10000>;
+	t-exit-dpd = <35000>;
+	};
+};
+
+*/
+&qspi {
+	status = "okay";
+	pinctrl-0 = <&qspi_default>;
+	pinctrl-1 = <&qspi_sleep>;
+	pinctrl-names = "default", "sleep";
+	mx25r64: mx25r6435f@0 {
+		compatible = "nordic,qspi-nor";
+	reg = <0>;
+	//MX25R64 supports only pp and pp4io
+	writeoc = "pp";
+	//MX25R64 supports all readoc options
+	readoc = "fastread";
+	sck-frequency = <8000000>;
+	jedec-id = [c2 28 17];
+	sfdp-bfp = [
+		e5 20 f1 ff  ff ff ff 03  44 eb 08 6b  08 3b 04 bb
+		ee ff ff ff  ff ff 00 ff  ff ff 00 ff  0c 20 0f 52
+		10 d8 00 ff  23 72 f5 00  82 ed 04 cc  44 83 68 44
+		30 b0 30 b0  f7 c4 d5 5c  00 be 29 ff  f0 d0 ff ff
+	];
+	size = <67108864>;
+	has-dpd;
+	t-enter-dpd = <10000>;
+	t-exit-dpd = <35000>;
+	};
+};
+
+
+
+&pinctrl {
+	//spi 1, imu sensor
+    spi1_default: spi1_default {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 0, 23)>,
+				<NRF_PSEL(SPIM_MISO, 0, 25)>,
+				<NRF_PSEL(SPIM_MOSI, 0, 24)>;
+		};
+	};
+
+	spi1_sleep: spi1_sleep {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 0, 23)>,
+				<NRF_PSEL(SPIM_MISO, 0, 25)>,
+				<NRF_PSEL(SPIM_MOSI, 0, 24)>;
+			low-power-enable;
+		};
+	};
+
+	
+	//spi 4, ppg sensor
+	ppg_default: ppg_default {
+		group1 {
+			psels = <NRF_PSEL(SPIM_MOSI, 1, 6)>, <NRF_PSEL(SPIM_MISO, 1, 7)>, <NRF_PSEL(SPIM_SCK, 1, 8)>;
+		};
+	};
+
+	ppg_sleep: ppg_sleep {
+		group1{
+			psels = <NRF_PSEL(SPIM_MOSI, 1, 6)>, <NRF_PSEL(SPIM_MISO, 1, 7)>, <NRF_PSEL(SPIM_SCK, 1, 8)>;
+			low-power-enable;
+		};
+	};
+	
+	/* 
+	//battery, on i2c0
+	i2c0_default: i2c0_default {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SDA, 1, 2)>,
+				<NRF_PSEL(TWIM_SCL, 1, 3)>;
+		};
+	};
+
+	i2c0_sleep: i2c0_sleep {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SDA, 1, 2)>,
+				<NRF_PSEL(TWIM_SCL, 1, 3)>;
+			low-power-enable;
+		};
+	};
+	*/
+
+};
+
+
 
 /delete-node/ &storage_partition;
 
@@ -27,3 +250,5 @@
 		cache-size = <4096>;
 	};
 };
+
+

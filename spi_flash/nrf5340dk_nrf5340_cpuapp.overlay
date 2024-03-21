@@ -1,12 +1,46 @@
-// To get started, press Ctrl+Space to bring up the completion menu and view the available nodes.
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-// You can also use the buttons in the sidebar to perform actions on nodes.
-// Actions currently available include:
 
-// * Enabling / disabling the node
-// * Adding the bus to a bus
-// * Removing the node
-// * Connecting ADC channels
+ / {
+	chosen {
+	
+		nordic,pm-ext-flash = &mx25r64;
+	
+		};
+	};
+	
+/delete-node/ &storage_partition;
 
-// For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
-// You can also visit the nRF DeviceTree extension documentation at https://nrfconnect.github.io/vscode-nrf-connect/devicetree/nrfdevicetree.html
+
+ &qspi {
+	 status = "okay";
+	 pinctrl-0 = <&qspi_default>;
+	 pinctrl-1 = <&qspi_sleep>;
+	 pinctrl-names = "default", "sleep";
+	 mx25r64: mx25r6435f@0 {
+		compatible = "senselab,qspinand";
+	 	reg = <0>;
+	 	//MX25R64 supports only pp and pp4io
+	 	writeoc = "pp4io";
+	 	//MX25R64 supports all readoc options
+	 	readoc = "fastread";
+	 	sck-frequency = <8000000>;
+		// 2nd bit could be 46 as well
+	 	jedec-id = [2c 47];
+	 	sfdp-bfp = [
+		 e5 20 f1 ff  ff ff ff 03  44 eb 08 6b  08 3b 04 bb
+		 ee ff ff ff  ff ff 00 ff  ff ff 00 ff  0c 20 0f 52
+		 10 d8 00 ff  23 72 f5 00  82 ed 04 cc  44 83 68 44
+		 30 b0 30 b0  f7 c4 d5 5c  00 be 29 ff  f0 d0 ff ff
+	 	];
+	 	size = <67108864>;
+	 	has-dpd;
+	 	t-enter-dpd = <10000>;
+	 	t-exit-dpd = <35000>;
+	 	};
+ };
+ 

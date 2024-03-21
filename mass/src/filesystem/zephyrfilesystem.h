@@ -16,3 +16,10 @@ void write_to_file(const void* data, size_t size);
 int close_all_files();
 
 void submit_write(const void* data, size_t size);
+
+
+void start_timer();
+
+int64_t stop_timer();
+
+extern int64_t start_time;

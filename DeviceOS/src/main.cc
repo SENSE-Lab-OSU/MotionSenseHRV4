@@ -522,7 +522,7 @@ void main(void){
   if (dev == NULL)
     return;
 	
-  ret = gpio_pin_configure(dev, PIN, GPIO_OUTPUT_ACTIVE | FLAGS);
+  ret = gpio_pin_configure(dev, LED_PIN, GPIO_OUTPUT_ACTIVE | FLAGS);
   if (ret < 0)
     return;
 
@@ -569,7 +569,7 @@ void main(void){
       led_is_on = !led_is_on;
     else
       led_is_on = 0;
-    gpio_pin_set(dev, PIN, (int)led_is_on);
+    gpio_pin_set(dev, LED_PIN, (int)led_is_on);
     k_msleep(SLEEP_TIME_MS);
   }
 }

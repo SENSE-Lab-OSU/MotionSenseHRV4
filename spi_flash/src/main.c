@@ -6,8 +6,10 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/flash.h>
+#include <zephyr/drivers/spi.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
+
 #include <zephyr/drivers/flash/nrf_qspi_nor.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,7 +32,11 @@
 
 void main(void)
 {
-	const uint8_t expected[] = { 0x55, 0xaa, 0x66, 0x99 };
+	
+	uint8_t expected[120];
+	for (int i = 0; i < sizeof(expected); i++){
+		expected[i] = i % 9;
+	}
 	const size_t len = sizeof(expected);
 	uint8_t buf[sizeof(expected)];
 	const struct device *flash_dev;
@@ -38,12 +44,14 @@ void main(void)
 
 	const struct device* test_qspi_dev = DEVICE_DT_GET(DT_NODELABEL(gpio1));
 	printk("got first device");
+	
 	flash_dev = DEVICE_DT_GET(DT_ALIAS(spi_flash0));
-	
-	
+	const struct device* spi_dev; //= DEVICE_DT_GET(DT_NODELABEL(spi4));
+	spi_dev = device_get_binding("spi@9000");
+	//DEVICE_DT_GET(DT_NODELABEL(spi0));
 
 
-
+	//flash_dev = NULL;
 	if (!device_is_ready(flash_dev)) {
 		printk("%s: device not ready.\n", flash_dev->name);
 		return;
@@ -80,6 +88,10 @@ void main(void)
 	
 
 	printf("Attempting to write %zu bytes\n", len);
+	rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
+	for (int i = 0; i < sizeof(expected); i++){
+		expected[i] = i % 4;
+	}
 	rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
 		printf("Flash write failed! %d\n", rc);
