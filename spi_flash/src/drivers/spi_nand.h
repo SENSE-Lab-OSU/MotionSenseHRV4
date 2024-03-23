@@ -133,4 +133,20 @@
 #define SPI_NOR_IS_32K_ALIGNED(_ofs) SPI_NOR_IS_ALIGNED(_ofs, 15)
 #define SPI_NOR_IS_64K_ALIGNED(_ofs) SPI_NOR_IS_ALIGNED(_ofs, 16)
 
+uint8_t get_features(const struct device* dev, uint8_t register_select);
+
+int set_features(const struct device* dev, uint8_t register_select, uint8_t data);
+
+
+uint8_t spi_nor_rdsr(const struct device *dev);
+
+int spi_nor_wrsr(const struct device *dev,
+			uint8_t sr);
+
+int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest);
+
+spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size);
+
+int spi_init(const struct device *dev);
+
 #endif /*__SPI_NOR_H__*/

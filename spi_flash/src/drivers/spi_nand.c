@@ -525,7 +525,7 @@ static void release_device(const struct device *dev)
  *
  * @return the non-negative value of the status register, or an error code.
  */
-static uint8_t spi_nor_rdsr(const struct device *dev)
+uint8_t spi_nor_rdsr(const struct device *dev)
 {
 	return get_status(dev);
 }
@@ -552,6 +552,9 @@ static int spi_nor_wrsr(const struct device *dev,
 	return ret;
 }
 
+int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
+
+}
 
 static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
 			size_t size)
@@ -567,10 +570,19 @@ static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
 	acquire_device(dev);
 
 	//CODE GOES HERE
+	
 
 	release_device(dev);
 	return ret;
 }
+
+
+spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size){
+
+
+}
+
+
 
 static int spi_nand_write(const struct device *dev, off_t addr,
 			 const void *src,
@@ -1120,7 +1132,7 @@ static int spi_nor_pm_control(const struct device *dev, enum pm_device_action ac
  * @param name The flash name
  * @return 0 on success, negative errno code otherwise
  */
-static int spi_nor_init(const struct device *dev)
+int spi_init(const struct device *dev)
 {
 	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
 		struct spi_nor_data* const driver_data = dev->data;
@@ -1128,7 +1140,7 @@ static int spi_nor_init(const struct device *dev)
 		k_sem_init(&driver_data->sem, 1, K_SEM_MAX_LIMIT);
 	}
 
-	return spi_nor_configure(dev);
+	return spi_configure(dev);
 }
 
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
