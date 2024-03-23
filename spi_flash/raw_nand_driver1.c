@@ -347,8 +347,6 @@ static int set_features(uint8_t register_select, uint8_t data){
 
 
 
-
-
 static inline void qspi_lock(const struct device *dev)
 {
 	struct qspi_nor_data *dev_data = dev->data;

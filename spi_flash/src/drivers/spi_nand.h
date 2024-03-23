@@ -9,7 +9,27 @@
 
 #include <zephyr/sys/util.h>
 
-#define SPI_NOR_MAX_ID_LEN	3
+
+//This is the raw nand driver, which does not use any FTL or heap (sram caching.) partial programs are limited to 4.
+
+//Page Program
+#define SPI_NAND_PL 0x02
+#define SPI_NAND_PE 0x10
+#define SPI_NAND_GF 0x0F
+#define SPI_NAND_CMD_RDID 0x9F
+#define SPI_NAND_PAGE_READ 0x13
+
+//Configuration Registers 
+#define REGISTER_BLOCKLOCK 0xA0
+#define REGISTER_CONFIGURATION 0xB0
+#define REGISTER_STATUS 0xC0
+#define REGISTER_DIESELECT 0xD0
+
+#define FLASH_DIE_ZERO 0x00
+#define FLASH_DIE_ONE 0x40
+
+//SHARED COMMANDS: BLOCK ERASE, WRITE ENABLE, WRITE DISABLE, PAGE_TRANSFER(qspi nor is PAGE READ), 
+
 
 /* Status register bits */
 #define SPI_NOR_WIP_BIT         BIT(0)  /* Write in progress */
