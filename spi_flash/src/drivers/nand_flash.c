@@ -1,9 +1,11 @@
+#include "spi_nand.h"
+#include <zephyr/drivers/flash.h>
 
 
 static const struct flash_driver_api spi_nor_api = {
-	.read = spi_nand_read,
-	.write = spi_nand_write,
-	.erase = spi_nand_erase,
+	.read = spi_nand_page_read,
+	.write = spi_nand_page_read,
+	.erase = ,
 	.get_parameters = flash_nor_get_parameters,
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
 	.page_layout = spi_nor_pages_layout,

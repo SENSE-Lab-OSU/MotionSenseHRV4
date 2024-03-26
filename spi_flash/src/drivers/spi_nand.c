@@ -74,108 +74,6 @@ LOG_MODULE_REGISTER(spi_nand, CONFIG_FLASH_LOG_LEVEL);
 #define T_DPDD_MS 0
 #endif /* DPD_WAKEUP_SEQUENCE */
 
-/* Build-time data associated with the device. */
-struct spi_nor_config {
-	/* Devicetree SPI configuration */
-	struct spi_dt_spec spi;
-
-#if DT_INST_NODE_HAS_PROP(0, reset_gpios)
-	const struct gpio_dt_spec reset;
-#endif
-
-	/* Runtime SFDP stores no static configuration. */
-
-#ifndef CONFIG_SPI_NOR_SFDP_RUNTIME
-	/* Size of device in bytes, from size property */
-	uint32_t flash_size;
-
-#ifdef CONFIG_FLASH_PAGE_LAYOUT
-	/* Flash page layout can be determined from devicetree. */
-	struct flash_pages_layout layout;
-#endif /* CONFIG_FLASH_PAGE_LAYOUT */
-
-	/* Expected JEDEC ID, from jedec-id property */
-	uint8_t jedec_id[SPI_NOR_MAX_ID_LEN];
-
-#if defined(CONFIG_SPI_NOR_SFDP_MINIMAL)
-	/* Optional support for entering 32-bit address mode. */
-	uint8_t enter_4byte_addr;
-#endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
-
-#if defined(CONFIG_SPI_NOR_SFDP_DEVICETREE)
-	/* Length of BFP structure, in 32-bit words. */
-	uint8_t bfp_len;
-
-	/* Pointer to the BFP table as read from the device
-	 * (little-endian stored words), from sfdp-bfp property
-	 */
-	const struct jesd216_bfp *bfp;
-#endif /* CONFIG_SPI_NOR_SFDP_DEVICETREE */
-#endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-
-	/* Optional bits in SR to be cleared on startup.
-	 *
-	 * This information cannot be derived from SFDP.
-	 */
-	uint8_t has_lock;
-};
-
-typedef struct spi_send_request {
-
-	uint8_t opcode;
-
-	bool is_write;
-	void* addr;
-	size_t addr_length; 
-	void* data;
-	size_t data_length;
-
-} spi_send_request;
-
-/**
- * struct spi_nor_data - Structure for defining the SPI NOR access
- * @sem: The semaphore to access to the flash
- */
-struct spi_nor_data {
-	struct k_sem sem;
-#if DT_INST_NODE_HAS_PROP(0, has_dpd)
-	/* Low 32-bits of uptime counter at which device last entered
-	 * deep power-down.
-	 */
-	uint32_t ts_enter_dpd;
-#endif
-
-	/* Miscellaneous flags */
-
-	/* If set addressed operations should use 32-bit rather than
-	 * 24-bit addresses.
-	 *
-	 * This is ignored if the access parameter to a command
-	 * explicitly specifies 24-bit or 32-bit addressing.
-	 */
-	bool flag_access_32bit: 1;
-
-	/* Minimal SFDP stores no dynamic configuration.  Runtime and
-	 * devicetree store page size and erase_types; runtime also
-	 * stores flash size and layout.
-	 */
-#ifndef CONFIG_SPI_NOR_SFDP_MINIMAL
-
-	struct jesd216_erase_type erase_types[JESD216_NUM_ERASE_TYPES];
-
-	/* Number of bytes per page */
-	uint16_t page_size;
-
-#ifdef CONFIG_SPI_NOR_SFDP_RUNTIME
-	/* Size of flash, in bytes */
-	uint32_t flash_size;
-
-#ifdef CONFIG_FLASH_PAGE_LAYOUT
-	struct flash_pages_layout layout;
-#endif /* CONFIG_FLASH_PAGE_LAYOUT */
-#endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-#endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
-};
 
 #ifdef CONFIG_SPI_NOR_SFDP_MINIMAL
 /* The historically supported erase sizes. */
@@ -190,6 +88,12 @@ static const struct jesd216_erase_type minimal_erase_types[JESD216_NUM_ERASE_TYP
 	},
 };
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
+
+
+int current_writes = 0;
+int current_reads = 0;
+int current_erases = 0;
+
 
 static int spi_nor_write_protection_set(const struct device *dev,
 					bool write_protect);
@@ -219,7 +123,7 @@ static inline uint32_t dev_flash_size(const struct device *dev)
 
 	return data->flash_size;
 #else /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-	const struct spi_nor_config *cfg = dev->config;
+	const struct spi_flash_config *cfg = dev->config;
 
 	return cfg->flash_size;
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
@@ -320,7 +224,7 @@ static inline void delay_until_exit_dpd_ok(const struct device *const dev)
  */
 static int spi_nor_access(const struct device *const dev, spi_send_request* request)
 {
-	const struct spi_nor_config* const driver_cfg = dev->config;
+	const struct spi_flash_config* const driver_cfg = dev->config;
 	struct spi_nor_data *const driver_data = dev->data;
 
 
@@ -544,9 +448,8 @@ uint8_t spi_nor_rdsr(const struct device *dev)
 static int spi_nor_wrsr(const struct device *dev,
 			uint8_t sr)
 {	
-	int ret = spi_nor_access(dev, SPI_NOR_CMD_WRSR, NOR_ACCESS_WRITE, 0, &sr,
-				    sizeof(sr));
-	pi_nor_wait_until_ready(dev);
+	int ret = set_features(dev, REGISTER_STATUS, sr);
+	spi_nor_wait_until_ready(dev);
 	
 
 	return ret;
@@ -554,11 +457,55 @@ static int spi_nor_wrsr(const struct device *dev,
 
 int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 
+	LOG_DBG("reading %d bytes at address %d", len, offset);
+	nrfx_err_t res = NRFX_SUCCESS;
+
+
+	__ASSERT(data != NULL, "null destination");
+
+	uint8_t addr_buf[] = {
+		page_addr >> 16,
+		page_addr >> 8,
+		page_addr,
+	};
+	uint8_t buffer_address[] = {0, 0, 0};
+
+	spi_send_request cread_cinstr_cfg = {
+		.opcode = SPI_NOR_CMD_READ,
+		.addr = buffer_address,
+		.addr_length = 3,
+		.data = dest,
+		.data_length = SPI_NOR_PAGE_SIZE
+	};
+
+
+	spi_send_request pread_cinstr_cfg = {
+		.opcode = SPI_NAND_PAGE_READ,
+		.addr = addr_buf,
+		.addr_length = 3,
+	};
+
+	res = spi_nor_access(dev, &pread_cinstr_cfg);
+	if (res != NRFX_SUCCESS) {
+		LOG_DBG("read transfer error: %x", res);
+		goto out;
+	}
+	spi_nor_wait_until_ready(dev);
+
+	res = spi_nor_access(dev, &cread_cinstr_cfg);
+	if (res != NRFX_SUCCESS) {
+		LOG_DBG("buffer transfer error: %x", res);
+		goto out;
+	}
+
+out:
+	LOG_DBG("finished read!");
 }
 
 static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
 			size_t size)
 {
+	current_reads++;
 	const size_t flash_size = dev_flash_size(dev);
 	int ret;
 
@@ -578,7 +525,56 @@ static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
 
 
 spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size){
+	
+	LOG_DBG("writing %d bytes at address %d", len, address);
+	nrfx_err_t res = NRFX_SUCCESS;
 
+	uint8_t pe_addr_buf[] = {
+	page_address >> 16,
+	page_address >> 8,
+	page_address,	
+	};
+
+	uint8_t pl_addr_buf[] = {0, 0};
+	// Program Load requires the data
+	spi_send_request pl_cinstr_cfg = {
+		.opcode = SPI_NAND_PL,
+		.addr = pl_addr_buf,
+		.addr_length = 3,
+		.data = src,
+		.data_length = size,
+	};
+
+	spi_send_request pe_cinstr_cfg = {
+		.opcode = SPI_NAND_PE,
+		.addr = pe_addr_buf,
+		.addr_length = 3
+	};
+	res = write_enable(dev);
+
+	res = spi_nor_access(dev, &pl_cinstr_cfg);
+	if (res != NRFX_SUCCESS) {
+		LOG_WRN("load error: %x", res);
+		return res;
+	}
+
+	LOG_DBG("load completed!");
+
+	//Start Execute Process
+
+	res = spi_nor_access(dev, &pe_cinstr_cfg);
+	if (res != NRFX_SUCCESS){
+		LOG_WRN("lfm_start: %x", res);
+		return res;
+	}
+	// wait for operation to finish, issue the get feature command.
+	spi_wait_for_completion(dev, res);
+	//k_sleep()
+	LOG_DBG("execute completed!");
+	write_disable(dev);
+	LOG_DBG("write completed!");
+	
+	return res;
 
 }
 
@@ -588,6 +584,7 @@ static int spi_nand_write(const struct device *dev, off_t addr,
 			 const void *src,
 			 size_t size)
 {
+	current_writes++;
 	const size_t flash_size = dev_flash_size(dev);
 	const uint16_t page_size = dev_page_size(dev);
 	int ret = 0;
@@ -616,8 +613,9 @@ static int spi_nand_write(const struct device *dev, off_t addr,
 			}
 
 			write_enable(dev);
-			ret = spi_nor_cmd_addr_write(dev, SPI_NOR_CMD_PP, addr,
-						src, to_write);
+			//ret = spi_nor_cmd_addr_write(dev, SPI_NOR_CMD_PP, addr,
+			//			src, to_write);
+			spi_nand_page_write(dev, addr, src, to_write);
 			if (ret != 0) {
 				break;
 			}
@@ -640,8 +638,32 @@ static int spi_nand_write(const struct device *dev, off_t addr,
 	return ret;
 }
 
+int spi_nand_block_erase(const struct device * dev, off_t block_addr){
+
+	current_erases++;
+	uint8_t pe_addr_buf[] = {
+	block_addr >> 16,
+	block_addr >> 8,
+	block_addr,	
+	};
+	
+	spi_send_request erase = {
+		.opcode = SPI_NOR_CMD_BE,
+		.addr = block_addr,
+		.addr_length = 3
+	};
+	write_enable(dev);
+	spi_nor_access(dev, &erase);
+	spi_nor_wait_until_ready(dev);
+	write_disable(dev);
+	return 0;
+
+}
+
+
 static int spi_nand_erase(const struct device *dev, off_t addr, size_t size)
 {
+	current_erases++;
 	const size_t flash_size = dev_flash_size(dev);
 	int ret = 0;
 
@@ -668,7 +690,7 @@ static int spi_nand_erase(const struct device *dev, off_t addr, size_t size)
 
 		if (size == flash_size) {
 			/* chip erase */
-			spi_nor_cmd_write(dev, SPI_NOR_CMD_CE);
+			//spi_nor_cmd_write(dev, SPI_NOR_CMD_CE);
 			size -= flash_size;
 		} else {
 			const struct jesd216_erase_type *erase_types =
@@ -688,7 +710,7 @@ static int spi_nand_erase(const struct device *dev, off_t addr, size_t size)
 				}
 			}
 			if (bet != NULL) {
-				spi_nor_cmd_addr_write(dev, bet->cmd, addr, NULL, 0);
+				//spi_nor_cmd_addr_write(dev, bet->cmd, addr, NULL, 0);
 				addr += BIT(bet->exp);
 				size -= BIT(bet->exp);
 			} else {
@@ -730,13 +752,17 @@ static int spi_nor_write_protection_set(const struct device *dev,
 {
 	int ret;
 
-	ret = spi_nor_cmd_write(dev, (write_protect) ?
-	      SPI_NOR_CMD_WRDI : SPI_NOR_CMD_WREN);
+	if (write_protect){
+	ret = write_enable(dev); 
+	}
+	else{ 
+		ret = write_disable(dev);
+	}
 
 	if (IS_ENABLED(DT_INST_PROP(0, requires_ulbpr))
 	    && (ret == 0)
 	    && !write_protect) {
-		ret = spi_nor_cmd_write(dev, SPI_NOR_CMD_ULBPR);
+		//ret = spi_nor_cmd_write(dev, SPI_NOR_CMD_ULBPR);
 	}
 
 	return ret;
@@ -817,10 +843,11 @@ static int spi_nor_set_address_mode(const struct device *dev,
 
 	if ((enter_4byte_addr & 0x02) != 0) {
 		/* Enter after WREN. */
-		ret = spi_nor_cmd_write(dev, SPI_NOR_CMD_WREN);
+		ret = write_enable(dev);
 	}
+	
 	if (ret == 0) {
-		ret = spi_nor_cmd_write(dev, SPI_NOR_CMD_4BA);
+		ret = spi_cmd(dev, SPI_NOR_CMD_4BA, NULL, 0);
 	}
 
 	if (ret == 0) {
@@ -834,125 +861,8 @@ static int spi_nor_set_address_mode(const struct device *dev,
 	return ret;
 }
 
-#ifndef CONFIG_SPI_NOR_SFDP_MINIMAL
-
-static int spi_nor_process_bfp(const struct device *dev,
-			       const struct jesd216_param_header *php,
-			       const struct jesd216_bfp *bfp)
-{
-	struct spi_nor_data *data = dev->data;
-	struct jesd216_erase_type *etp = data->erase_types;
-	const size_t flash_size = jesd216_bfp_density(bfp) / 8U;
-
-	LOG_INF("%s: %u MiBy flash", dev->name, (uint32_t)(flash_size >> 20));
-
-	/* Copy over the erase types, preserving their order.  (The
-	 * Sector Map Parameter table references them by index.)
-	 */
-	memset(data->erase_types, 0, sizeof(data->erase_types));
-	for (uint8_t ti = 1; ti <= ARRAY_SIZE(data->erase_types); ++ti) {
-		if (jesd216_bfp_erase(bfp, ti, etp) == 0) {
-			LOG_DBG("Erase %u with %02x", (uint32_t)BIT(etp->exp), etp->cmd);
-		}
-		++etp;
-	}
-
-	data->page_size = jesd216_bfp_page_size(php, bfp);
-#ifdef CONFIG_SPI_NOR_SFDP_RUNTIME
-	data->flash_size = flash_size;
-#else /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-	if (flash_size != dev_flash_size(dev)) {
-		LOG_ERR("BFP flash size mismatch with devicetree");
-		return -EINVAL;
-	}
-#endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-
-	LOG_DBG("Page size %u bytes", data->page_size);
-
-	/* If 4-byte addressing is supported, switch to it. */
-	if (jesd216_bfp_addrbytes(bfp) != JESD216_SFDP_BFP_DW1_ADDRBYTES_VAL_3B) {
-		struct jesd216_bfp_dw16 dw16;
-		int rc = 0;
-
-		if (jesd216_bfp_decode_dw16(php, bfp, &dw16) == 0) {
-			rc = spi_nor_set_address_mode(dev, dw16.enter_4ba);
-		}
-
-		if (rc != 0) {
-			LOG_ERR("Unable to enter 4-byte mode: %d\n", rc);
-			return rc;
-		}
-	}
-	return 0;
-}
 
 
-#if defined(CONFIG_FLASH_PAGE_LAYOUT)
-static int setup_pages_layout(const struct device *dev)
-{
-	int rv = 0;
-
-#if defined(CONFIG_SPI_NOR_SFDP_RUNTIME)
-	struct spi_nor_data *data = dev->data;
-	const size_t flash_size = dev_flash_size(dev);
-	const uint32_t layout_page_size = CONFIG_SPI_NOR_FLASH_LAYOUT_PAGE_SIZE;
-	uint8_t exp = 0;
-
-	/* Find the smallest erase size. */
-	for (size_t i = 0; i < ARRAY_SIZE(data->erase_types); ++i) {
-		const struct jesd216_erase_type *etp = &data->erase_types[i];
-
-		if ((etp->cmd != 0)
-		    && ((exp == 0) || (etp->exp < exp))) {
-			exp = etp->exp;
-		}
-	}
-
-	if (exp == 0) {
-		return -ENOTSUP;
-	}
-
-	uint32_t erase_size = BIT(exp);
-
-	/* Error if layout page size is not a multiple of smallest
-	 * erase size.
-	 */
-	if ((layout_page_size % erase_size) != 0) {
-		LOG_ERR("layout page %u not compatible with erase size %u",
-			layout_page_size, erase_size);
-		return -EINVAL;
-	}
-
-	/* Warn but accept layout page sizes that leave inaccessible
-	 * space.
-	 */
-	if ((flash_size % layout_page_size) != 0) {
-		LOG_INF("layout page %u wastes space with device size %zu",
-			layout_page_size, flash_size);
-	}
-
-	data->layout.pages_size = layout_page_size;
-	data->layout.pages_count = flash_size / layout_page_size;
-	LOG_DBG("layout %u x %u By pages", data->layout.pages_count, data->layout.pages_size);
-#elif defined(CONFIG_SPI_NOR_SFDP_DEVICETREE)
-	const struct spi_nor_config *cfg = dev->config;
-	const struct flash_pages_layout *layout = &cfg->layout;
-	const size_t flash_size = dev_flash_size(dev);
-	size_t layout_size = layout->pages_size * layout->pages_count;
-
-	if (flash_size != layout_size) {
-		LOG_ERR("device size %u mismatch %zu * %zu By pages",
-			flash_size, layout->pages_count, layout->pages_size);
-		return -EINVAL;
-	}
-#else /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-#error Unhandled SFDP choice
-#endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-
-	return rv;
-}
-#endif /* CONFIG_FLASH_PAGE_LAYOUT */
-#endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 
 /**
  * @brief Configure the flash
@@ -963,7 +873,7 @@ static int setup_pages_layout(const struct device *dev)
  */
 static int spi_nor_configure(const struct device *dev)
 {
-	const struct spi_nor_config *cfg = dev->config;
+	const struct spi_flash_config *cfg = dev->config;
 	uint8_t jedec_id[SPI_NOR_MAX_ID_LEN];
 	int rc;
 
@@ -990,11 +900,6 @@ static int spi_nor_configure(const struct device *dev)
 	/* After a soft-reset the flash might be in DPD or busy writing/erasing.
 	 * Exit DPD and wait until flash is ready.
 	 */
-	acquire_device(dev);
-
-
-
-	release_device(dev);
 
 	/* now the spi bus is configured, we can verify SPI
 	 * connectivity by reading the JEDEC ID.
@@ -1155,7 +1060,7 @@ static void spi_nor_pages_layout(const struct device *dev,
 
 	*layout = &data->layout;
 #else /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-	const struct spi_nor_config *cfg = dev->config;
+	const struct spi_flash_config *cfg = dev->config;
 
 	*layout = &cfg->layout;
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */

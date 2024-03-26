@@ -6,6 +6,8 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/flash.h>
+#include <zephyr/drivers/disk.h>
+#include "drivers/nand_disk.h"
 #include <zephyr/drivers/spi.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
@@ -59,7 +61,8 @@ void main(void)
 	}
 
 
-
+	const struct disk_operations* disk_api = (const struct disk_operations*)spi_dev->api;
+ 
 	printf("\n%s SPI flash testing\n", flash_dev->name);
 	printf("==========================\n");
 	k_sleep(K_MSEC(500));
@@ -76,8 +79,8 @@ void main(void)
 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
 	 * SPI_FLASH_SECTOR_SIZE = flash size
 	 */
-	rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
-			 SPI_FLASH_SECTOR_SIZE);
+	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
+	//		 SPI_FLASH_SECTOR_SIZE);
 	if (rc != 0) {
 		printf("Flash erase failed! %d\n", rc);
 	} else {
@@ -89,18 +92,22 @@ void main(void)
 	
 
 	printf("Attempting to write %zu bytes\n", len);
-	rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
+	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
+	
+
 	for (int i = 0; i < sizeof(expected); i++){
 		expected[i] = i % 4;
 	}
-	rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
+	rc = disk_api->write(&sdmmc_disk, expected, 4, 0);
+	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
 		printf("Flash write failed! %d\n", rc);
 		return;
 	}
 
 	memset(buf, 0, len);
-	rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
+	rc = disk_api->read(&sdmmc_disk, buf, 1, 0);
+	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
 		printf("Flash read failed! %d\n", rc);
 		return;

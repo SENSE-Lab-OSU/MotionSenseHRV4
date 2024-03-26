@@ -133,6 +133,118 @@
 #define SPI_NOR_IS_32K_ALIGNED(_ofs) SPI_NOR_IS_ALIGNED(_ofs, 15)
 #define SPI_NOR_IS_64K_ALIGNED(_ofs) SPI_NOR_IS_ALIGNED(_ofs, 16)
 
+
+/* Build-time data associated with the device. */
+struct spi_flash_config {
+	/* Devicetree SPI configuration */
+	struct spi_dt_spec spi;
+
+#if DT_INST_NODE_HAS_PROP(0, reset_gpios)
+	const struct gpio_dt_spec reset;
+#endif
+
+	/* Runtime SFDP stores no static configuration. */
+
+#ifndef CONFIG_SPI_NOR_SFDP_RUNTIME
+	/* Size of device in bytes, from size property */
+	uint32_t flash_size;
+
+#ifdef CONFIG_FLASH_PAGE_LAYOUT
+	/* Flash page layout can be determined from devicetree. */
+	struct flash_pages_layout layout;
+#endif /* CONFIG_FLASH_PAGE_LAYOUT */
+
+	/* Expected JEDEC ID, from jedec-id property */
+	uint8_t jedec_id[SPI_NOR_MAX_ID_LEN];
+
+#if defined(CONFIG_SPI_NOR_SFDP_MINIMAL)
+	/* Optional support for entering 32-bit address mode. */
+	uint8_t enter_4byte_addr;
+#endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
+
+#if defined(CONFIG_SPI_NOR_SFDP_DEVICETREE)
+	/* Length of BFP structure, in 32-bit words. */
+	uint8_t bfp_len;
+
+	/* Pointer to the BFP table as read from the device
+	 * (little-endian stored words), from sfdp-bfp property
+	 */
+	const struct jesd216_bfp *bfp;
+#endif /* CONFIG_SPI_NOR_SFDP_DEVICETREE */
+#endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
+
+	/* Optional bits in SR to be cleared on startup.
+	 *
+	 * This information cannot be derived from SFDP.
+	 */
+	uint8_t has_lock;
+};
+
+typedef struct spi_send_request {
+
+	uint8_t opcode;
+
+	bool is_write;
+	void* addr;
+	size_t addr_length; 
+	void* data;
+	size_t data_length;
+
+} spi_send_request;
+
+/**
+ * struct spi_nor_data - Structure for defining the SPI NOR access
+ * @sem: The semaphore to access to the flash
+ */
+struct spi_nor_data {
+	struct k_sem sem;
+#if DT_INST_NODE_HAS_PROP(0, has_dpd)
+	/* Low 32-bits of uptime counter at which device last entered
+	 * deep power-down.
+	 */
+	uint32_t ts_enter_dpd;
+#endif
+
+	/* Miscellaneous flags */
+
+	/* If set addressed operations should use 32-bit rather than
+	 * 24-bit addresses.
+	 *
+	 * This is ignored if the access parameter to a command
+	 * explicitly specifies 24-bit or 32-bit addressing.
+	 */
+	bool flag_access_32bit: 1;
+
+	/* Minimal SFDP stores no dynamic configuration.  Runtime and
+	 * devicetree store page size and erase_types; runtime also
+	 * stores flash size and layout.
+	 */
+#ifndef CONFIG_SPI_NOR_SFDP_MINIMAL
+
+	struct jesd216_erase_type erase_types[JESD216_NUM_ERASE_TYPES];
+
+	/* Number of bytes per page */
+	uint16_t page_size;
+
+#ifdef CONFIG_SPI_NOR_SFDP_RUNTIME
+	/* Size of flash, in bytes */
+	uint32_t flash_size;
+
+#ifdef CONFIG_FLASH_PAGE_LAYOUT
+	struct flash_pages_layout layout;
+#endif /* CONFIG_FLASH_PAGE_LAYOUT */
+#endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
+#endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
+};
+
+
+
+off_t convert_to_address(uint32_t page, uint32_t block);
+
+off_t convert_page_to_address(uint32_t page);
+
+off_t convert_block_to_address(uint32_t block);
+
 uint8_t get_features(const struct device* dev, uint8_t register_select);
 
 int set_features(const struct device* dev, uint8_t register_select, uint8_t data);
@@ -146,6 +258,8 @@ int spi_nor_wrsr(const struct device *dev,
 int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest);
 
 spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size);
+
+int spi_nand_block_erase(const struct device * dev, off_t block_addr);
 
 int spi_init(const struct device *dev);
 

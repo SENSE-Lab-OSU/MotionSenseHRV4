@@ -8,7 +8,7 @@
  * SDMMC disk driver using zephyr SD subsystem
  */
 #define DT_DRV_COMPAT zephyr_sdmmc_disk
-
+#include <zephyr/device.h>
 #include <zephyr/drivers/disk.h>
 #include "spi_nand.h"
 
@@ -20,11 +20,11 @@ enum sd_status {
 };
 
 struct sdmmc_config {
-	const struct device *host_controller;
+	//const struct device *host_controller;
 };
 
 struct sdmmc_data {
-	struct sd_card card;
+	//struct sd_card card;
 	enum sd_status status;
 	char *name;
 };
@@ -37,10 +37,10 @@ static int disk_nand_access_init(struct disk_info *disk)
 	return sucess;
 }
 
-static int nand_access_status(struct disk_info *disk)
+static int disk_nand_access_status(struct disk_info *disk)
 {
 	const struct device* dev = disk->dev;
-	const struct sdmmc_config *cfg = dev->config;
+	const struct sdmmc_config* cfg = dev->config;
 	struct sdmmc_data *data = dev->data;
 
 	if (!sd_is_card_present(cfg->host_controller)) {
@@ -58,9 +58,10 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 {
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
-	//spi_nand_page_read(dev)
+	off_t addr = convert_page_to_address(sector);
+	int ret = spi_nand_page_read(dev, addr, buf);
 
-	return //sdmmc_read_blocks(&data->card, buf, sector, count);
+	return ret; //sdmmc_read_blocks(&data->card, buf, sector, count);
 }
 
 static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
@@ -69,7 +70,10 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 
-	return sdmmc_write_blocks(&data->card, buf, sector, count);
+	off_t addr = convert_page_to_address(sector);
+	// Do we know what count means?
+	int ret = spi_nand_page_write(dev, addr, buf, count);
+	return ret; //sdmmc_write_blocks(&data->card, buf, sector, count);
 }
 
 static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf)
@@ -94,7 +98,7 @@ static struct disk_info sdmmc_disk = {
 
 static int disk_sdmmc_init(const struct device *dev)
 {
-	struct sdmmc_data *data = dev->data;
+	struct sdmmc_data* data = dev->data;
 
 	data->status = SD_UNINIT;
 	sdmmc_disk.dev = dev;
@@ -115,8 +119,8 @@ static int disk_sdmmc_init(const struct device *dev)
 	DEVICE_DT_INST_DEFINE(n,						\
 			&disk_sdmmc_init,					\
 			NULL,							\
-			&sdmmc_data_##n,					\
-			&sdmmc_config_##n,					\
+			&spi_nor_data_##n,					\
+			&spi_flash_config_##n,					\
 			POST_KERNEL,						\
 			CONFIG_SD_INIT_PRIORITY,				\
 			NULL);
