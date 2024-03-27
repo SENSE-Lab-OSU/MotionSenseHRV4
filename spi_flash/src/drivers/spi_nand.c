@@ -8,20 +8,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#define DT_DRV_COMPAT jedec_spi_nor
-
-#define SPI_NOR_MAX_ID_LEN	3
-
-#define DT_DRV_COMPAT senselab_qspinand
 
 #define CONFIG_NORDIC_QSPI_NOR_STACK_WRITE_BUFFER_SIZE 4
 
 
 #include <errno.h>
-#include <zephyr/drivers/flash.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/disk.h>
-#include <zephyr/drivers/spi.h>
 #include <zephyr/init.h>
 #include <string.h>
 #include <zephyr/logging/log.h>
@@ -98,19 +91,16 @@ int current_erases = 0;
 static int spi_nor_write_protection_set(const struct device *dev,
 					bool write_protect);
 
+struct jesd216_erase_type erasetype = {
+		.cmd = SPI_NOR_CMD_BE
+	};
 /* Get pointer to array of supported erase types.  Static const for
  * minimal, data for runtime and devicetree.
  */
-static inline const struct jesd216_erase_type *
-dev_erase_types(const struct device *dev)
+static inline const struct jesd216_erase_type* dev_erase_types(const struct device *dev)
 {
-#ifdef CONFIG_SPI_NOR_SFDP_MINIMAL
-	return minimal_erase_types;
-#else /* CONFIG_SPI_NOR_SFDP_MINIMAL */
-	const struct spi_nor_data *data = dev->data;
-
-	return data->erase_types;
-#endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
+	
+	return &erasetype;
 }
 
 /* Get the size of the flash device.  Data for runtime, constant for
@@ -210,6 +200,23 @@ static inline void delay_until_exit_dpd_ok(const struct device *const dev)
  */
 #define NOR_ACCESS_WRITE BIT(7)
 
+
+off_t convert_to_address(uint32_t page, uint32_t block){
+	return page + (block * 64);
+}
+
+off_t convert_page_to_address(uint32_t page){
+	return page;
+
+}
+
+off_t convert_block_to_address(uint32_t block){
+	return block* 64;
+}
+
+
+
+
 /*
  * @brief Send an SPI command
  *
@@ -269,7 +276,7 @@ static int spi_cmd(const struct device* dev, uint8_t opcode, void* dest, size_t 
 		.data = dest,
 		.data_length = length
 	};
-	spi_nor_acess(dev, &request); 
+	return spi_nor_access(dev, &request); 
 }
 
 #define spi_nor_cmd_addr_read(dev, opcode, addr, dest, length) \
@@ -295,41 +302,53 @@ static uint8_t get_status(const struct device* dev){
 static int write_enable(const struct device* dev){
 	// First, enable write acess if needed
 	
-		spi_cmd(dev, SPI_NOR_CMD_WREN, NULL, 0);
+		int ret = spi_cmd(dev, SPI_NOR_CMD_WREN, NULL, 0);
+		if (ret != 0){
+			LOG_WRN("write enable failed");
+		}
+		return ret;
 }
 	
 		
 
-
 static int write_disable(const struct device* dev){
 	
-	spi_cmd(dev, SPI_NOR_CMD_WRDI, NULL, 0);
+	int ret = spi_cmd(dev, SPI_NOR_CMD_WRDI, NULL, 0);
+	if (ret != 0){
+			LOG_WRN("write disable failed");
+	}
+	return ret;
 }
 
-static uint8_t get_features(const struct device* dev, uint8_t register_select){
 
-	uint8_t* data;
+uint8_t get_features(const struct device* dev, uint8_t register_select){
+
+	uint8_t data;
 
 	spi_send_request request = {
 		.opcode = SPI_NAND_GF,
 		.addr = &register_select,
 		.addr_length = 1,
-		.data = data,
+		.data = &data,
 		.data_length = 1,
 	};
-	nrfx_err_t res = spi_nor_access(dev, &request);
-	if (res == NRFX_SUCCESS){
-	return data;
+
+	int res = spi_nor_access(dev, &request);
+
+	if (res == 0){
+		LOG_DBG("sucess getting register ");
+		return data;
 	}
 	else {
-		return -1;
+		LOG_WRN("get features error");
+		return 253;
 	}
 }
 
 // Should only be used to set all features. to only set an induvidual feature, use set_feature 
-static int set_features(const struct device* dev, uint8_t register_select, uint8_t data){
+int set_features(const struct device* dev, uint8_t register_select, uint8_t data){
 	 
-
+	LOG_INF("setting features for value: %d", data);
 	uint8_t data_arr = {
 		register_select,
 		data
@@ -345,7 +364,7 @@ static int set_features(const struct device* dev, uint8_t register_select, uint8
 	};
 
 	nrfx_err_t res = spi_nor_access(dev, &write_features_request);
-	if (res == NRFX_SUCCESS){
+	if (res == 0){
 	if (get_features(dev, register_select) == data){
 		return 1;
 	}
@@ -431,7 +450,9 @@ static void release_device(const struct device *dev)
  */
 uint8_t spi_nor_rdsr(const struct device *dev)
 {
-	return get_status(dev);
+	uint8_t status = get_status(dev);
+	LOG_DBG("status register: %d", status);
+	return status;
 }
 
 /**
@@ -445,7 +466,7 @@ uint8_t spi_nor_rdsr(const struct device *dev)
  *
  * @return 0 on success or a negative error code.
  */
-static int spi_nor_wrsr(const struct device *dev,
+int spi_nor_wrsr(const struct device *dev,
 			uint8_t sr)
 {	
 	int ret = set_features(dev, REGISTER_STATUS, sr);
@@ -457,8 +478,8 @@ static int spi_nor_wrsr(const struct device *dev,
 
 int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 
-	LOG_DBG("reading %d bytes at address %d", len, offset);
-	nrfx_err_t res = NRFX_SUCCESS;
+	LOG_DBG("reading bytes at address %d", page_addr);
+	nrfx_err_t res = 0;
 
 
 	__ASSERT(data != NULL, "null destination");
@@ -486,20 +507,21 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 	};
 
 	res = spi_nor_access(dev, &pread_cinstr_cfg);
-	if (res != NRFX_SUCCESS) {
+	if (res != 0) {
 		LOG_DBG("read transfer error: %x", res);
 		goto out;
 	}
 	spi_nor_wait_until_ready(dev);
 
 	res = spi_nor_access(dev, &cread_cinstr_cfg);
-	if (res != NRFX_SUCCESS) {
+	if (res != 0) {
 		LOG_DBG("buffer transfer error: %x", res);
 		goto out;
 	}
 
 out:
 	LOG_DBG("finished read!");
+	return 0;
 }
 
 static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
@@ -524,10 +546,10 @@ static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
 }
 
 
-spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size){
+int spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size){
 	
-	LOG_DBG("writing %d bytes at address %d", len, address);
-	nrfx_err_t res = NRFX_SUCCESS;
+	LOG_DBG("writing %d bytes at address %d", size, page_address);
+	nrfx_err_t res = 0;
 
 	uint8_t pe_addr_buf[] = {
 	page_address >> 16,
@@ -553,7 +575,7 @@ spi_nand_page_write(const struct device* dev, off_t page_address, const void* sr
 	res = write_enable(dev);
 
 	res = spi_nor_access(dev, &pl_cinstr_cfg);
-	if (res != NRFX_SUCCESS) {
+	if (res != 0) {
 		LOG_WRN("load error: %x", res);
 		return res;
 	}
@@ -563,12 +585,12 @@ spi_nand_page_write(const struct device* dev, off_t page_address, const void* sr
 	//Start Execute Process
 
 	res = spi_nor_access(dev, &pe_cinstr_cfg);
-	if (res != NRFX_SUCCESS){
+	if (res != 0){
 		LOG_WRN("lfm_start: %x", res);
 		return res;
 	}
 	// wait for operation to finish, issue the get feature command.
-	spi_wait_for_completion(dev, res);
+	spi_nor_wait_until_ready(dev);
 	//k_sleep()
 	LOG_DBG("execute completed!");
 	write_disable(dev);
@@ -792,7 +814,7 @@ static int spi_nor_read_jedec_id(const struct device *dev,
 	}
 
 	acquire_device(dev);	
-	int ret = spi_cmd(dev, SPI_NOR_CMD_RDID, id, SPI_NOR_MAX_ID_LEN);
+	int ret = spi_cmd(dev, SPI_NOR_CMD_RDID, id, SPI_MAX_ID_LEN);
 
 	release_device(dev);
 
@@ -871,10 +893,10 @@ static int spi_nor_set_address_mode(const struct device *dev,
  * @param info The flash info structure
  * @return 0 on success, negative errno code otherwise
  */
-static int spi_nor_configure(const struct device *dev)
+static int spi_configure(const struct device *dev)
 {
 	const struct spi_flash_config *cfg = dev->config;
-	uint8_t jedec_id[SPI_NOR_MAX_ID_LEN];
+	uint8_t jedec_id[SPI_MAX_ID_LEN];
 	int rc;
 
 	/* Validate bus and CS is ready */
@@ -923,6 +945,9 @@ static int spi_nor_configure(const struct device *dev)
 			cfg->jedec_id[0], cfg->jedec_id[1], cfg->jedec_id[2]);
 		return -EINVAL;
 	}
+	else {
+		LOG_INF("ID %02x %02x %02x correct!", jedec_id[0], jedec_id[1], jedec_id[2]);
+	}
 #endif
 
 	/* Check for block protect bits that need to be cleared.  This
@@ -930,23 +955,27 @@ static int spi_nor_configure(const struct device *dev)
 	 * devicetree node property must be set correctly for any device
 	 * that powers up with block protect enabled.
 	 */
+	acquire_device(dev);
+	uint8_t status = spi_nor_rdsr(dev);
+	release_device(dev);
+	LOG_DBG("status register: %d", status);
+	/*
 	if (cfg->has_lock != 0) {
 		acquire_device(dev);
 
-		rc = spi_nor_rdsr(dev);
-
-		/* Only clear if RDSR worked and something's set. */
+		uint8_t status = spi_nor_rdsr(dev);
+		LOG_INF("Status Register: %d", status);
 		if (rc > 0) {
-			rc = spi_nor_wrsr(dev, rc & ~cfg->has_lock);
+			//rc = spi_nor_wrsr(dev, rc & ~cfg->has_lock);
 		}
 
 		if (rc != 0) {
 			LOG_ERR("BP clear failed: %d\n", rc);
 			return -ENODEV;
 		}
-
-		release_device(dev);
-	}
+	*/
+		
+	
 
 #ifdef CONFIG_SPI_NOR_SFDP_MINIMAL
 	/* For minimal we support some overrides from specific
@@ -961,18 +990,10 @@ static int spi_nor_configure(const struct device *dev)
 		}
 	}
 
-#else /* CONFIG_SPI_NOR_SFDP_MINIMAL */
-	/* For devicetree and runtime we need to process BFP data and
-	 * set up or validate page layout.
-	 */
-	rc = spi_nor_process_sfdp(dev);
-	if (rc != 0) {
-		LOG_ERR("SFDP read failed: %d", rc);
-		return -ENODEV;
-	}
+#else 
 
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
-	rc = setup_pages_layout(dev);
+	//rc = setup_pages_layout(dev);
 	if (rc != 0) {
 		LOG_ERR("layout setup failed: %d", rc);
 		return -ENODEV;
@@ -980,16 +1001,17 @@ static int spi_nor_configure(const struct device *dev)
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 
+/*
 #if DT_INST_NODE_HAS_PROP(0, mxicy_mx25r_power_mode)
-	/* Do not fail init if setting configuration register fails */
+	
 	(void) mxicy_configure(dev, jedec_id);
-#endif /* DT_INST_NODE_HAS_PROP(0, mxicy_mx25r_power_mode) */
+#endif 
 
 	if (IS_ENABLED(CONFIG_SPI_NOR_IDLE_IN_DPD)
 	    && (enter_dpd(dev) != 0)) {
 		return -ENODEV;
 	}
-
+*/
 	return 0;
 }
 

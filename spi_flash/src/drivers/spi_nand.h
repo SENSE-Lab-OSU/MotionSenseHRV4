@@ -8,9 +8,15 @@
 #define __SPI_NOR_H__
 
 #include <zephyr/sys/util.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/flash.h>
 
 
 //This is the raw nand driver, which does not use any FTL or heap (sram caching.) partial programs are limited to 4.
+
+
+#define SPI_MAX_ID_LEN	3
+
 
 //Page Program
 #define SPI_NAND_PL 0x02
@@ -134,6 +140,9 @@
 #define SPI_NOR_IS_64K_ALIGNED(_ofs) SPI_NOR_IS_ALIGNED(_ofs, 16)
 
 
+
+
+
 /* Build-time data associated with the device. */
 struct spi_flash_config {
 	/* Devicetree SPI configuration */
@@ -155,7 +164,7 @@ struct spi_flash_config {
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 
 	/* Expected JEDEC ID, from jedec-id property */
-	uint8_t jedec_id[SPI_NOR_MAX_ID_LEN];
+	uint8_t jedec_id[SPI_MAX_ID_LEN];
 
 #if defined(CONFIG_SPI_NOR_SFDP_MINIMAL)
 	/* Optional support for entering 32-bit address mode. */
@@ -221,8 +230,6 @@ struct spi_nor_data {
 	 */
 #ifndef CONFIG_SPI_NOR_SFDP_MINIMAL
 
-	struct jesd216_erase_type erase_types[JESD216_NUM_ERASE_TYPES];
-
 	/* Number of bytes per page */
 	uint16_t page_size;
 
@@ -257,7 +264,7 @@ int spi_nor_wrsr(const struct device *dev,
 
 int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest);
 
-spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size);
+int spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size);
 
 int spi_nand_block_erase(const struct device * dev, off_t block_addr);
 

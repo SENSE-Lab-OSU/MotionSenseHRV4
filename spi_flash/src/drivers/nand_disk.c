@@ -7,10 +7,13 @@
 /*
  * SDMMC disk driver using zephyr SD subsystem
  */
-#define DT_DRV_COMPAT zephyr_sdmmc_disk
+
 #include <zephyr/device.h>
 #include <zephyr/drivers/disk.h>
+#include <zephyr/devicetree.h>
 #include "spi_nand.h"
+
+#define DT_DRV_COMPAT senselab_nanddisk
 
 
 enum sd_status {
@@ -37,10 +40,16 @@ static int disk_nand_access_init(struct disk_info *disk)
 	return sucess;
 }
 
+
+static int disk_acess_init2(struct disk_info *disk){
+	return 0;
+} 
+
 static int disk_nand_access_status(struct disk_info *disk)
 {
 	const struct device* dev = disk->dev;
-	const struct sdmmc_config* cfg = dev->config;
+	
+	/*const struct sdmmc_config* cfg = dev->config;
 	struct sdmmc_data *data = dev->data;
 
 	if (!sd_is_card_present(cfg->host_controller)) {
@@ -51,6 +60,10 @@ static int disk_nand_access_status(struct disk_info *disk)
 	} else {
 		return DISK_STATUS_UNINIT;
 	}
+	*/
+	uint8_t status = spi_nor_rdsr(dev);
+	return DISK_STATUS_OK;
+
 }
 
 static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
@@ -81,32 +94,110 @@ static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 
-	return sdmmc_ioctl(&data->card, cmd, buf);
+	return 0; //sdmmc_ioctl(&data->card, cmd, buf);
 }
 
 static const struct disk_operations sdmmc_disk_ops = {
-	.init = disk_nand_access_init,
+	.init = disk_acess_init2,
 	.status = disk_nand_access_status,
 	.read = disk_nand_access_read,
 	.write = disk_nand_access_write,
 	.ioctl = disk_nand_access_ioctl,
 };
 
-static struct disk_info sdmmc_disk = {
+struct disk_info sdmmc_disk = {
 	.ops = &sdmmc_disk_ops,
 };
 
+#define CONFIG_SPI_FLASH_LAYOUT_PAGE_SIZE 4096
+
+#define LAYOUT_PAGES_COUNT 1000
+
+BUILD_ASSERT(DT_INST_NODE_HAS_PROP(0, size),
+	     "jedec,spi-nor size required for non-runtime SFDP page layout");
+
+#if defined(CONFIG_FLASH_PAGE_LAYOUT)
+
+
+BUILD_ASSERT(DT_INST_NODE_HAS_PROP(0, size),
+	     "jedec,spi-nor size required for non-runtime SFDP page layout");
+
+
+#define INST_0_BYTES (DT_INST_PROP(0, size) / 8)
+
+BUILD_ASSERT(SPI_NOR_IS_SECTOR_ALIGNED(CONFIG_SPI_FLASH_LAYOUT_PAGE_SIZE),
+	     "SPI_NOR_FLASH_LAYOUT_PAGE_SIZE must be multiple of 4096");
+
+
+#define LAYOUT_PAGES_COUNT (INST_0_BYTES / CONFIG_SPI_FLASH_LAYOUT_PAGE_SIZE)
+
+BUILD_ASSERT((CONFIG_SPI_FLASH_LAYOUT_PAGE_SIZE * LAYOUT_PAGES_COUNT)
+	     == INST_0_BYTES,
+	     "SPI_NOR_FLASH_LAYOUT_PAGE_SIZE incompatible with flash size");
+
+#endif 
+
+
+
+static const struct spi_flash_config spi_flash_config_0 = 
+{
+	
+	.spi = SPI_DT_SPEC_INST_GET(0, SPI_WORD_SET(8),
+				    0),
+#if DT_INST_NODE_HAS_PROP(0, reset_gpios)
+	.reset = GPIO_DT_SPEC_INST_GET(0, reset_gpios),
+#endif
+
+#if !defined(CONFIG_SPI_NOR_SFDP_RUNTIME)
+
+#if defined(CONFIG_FLASH_PAGE_LAYOUT)
+	.layout = {
+		.pages_count = LAYOUT_PAGES_COUNT,
+		.pages_size = CONFIG_SPI_FLASH_LAYOUT_PAGE_SIZE,
+	},
+#undef LAYOUT_PAGES_COUNT
+#endif 
+
+	.flash_size = DT_INST_PROP(0, size) / 8,
+	.jedec_id = DT_INST_PROP(0, jedec_id),
+
+#if DT_INST_NODE_HAS_PROP(0, has_lock)
+	.has_lock = DT_INST_PROP(0, has_lock),
+#endif
+#if defined(CONFIG_SPI_NOR_SFDP_MINIMAL)		\
+	&& DT_INST_NODE_HAS_PROP(0, enter_4byte_addr)
+	.enter_4byte_addr = DT_INST_PROP(0, enter_4byte_addr),
+#endif
+#ifdef CONFIG_SPI_NOR_SFDP_DEVICETREE
+	.bfp_len = sizeof(bfp_data_0) / 4,
+	.bfp = (const struct jesd216_bfp *)bfp_data_0,
+	
+#endif 
+
+#endif 
+
+};
+
+static struct spi_nor_data spi_nor_data_0;
+
+
+
+
 static int disk_sdmmc_init(const struct device *dev)
 {
-	struct sdmmc_data* data = dev->data;
+	//struct sdmmc_data* data = dev->data;
+	//data->status = SD_UNINIT;
 
-	data->status = SD_UNINIT;
+	//spi_nor_data* nand_data = dev->data;
+	
+
 	sdmmc_disk.dev = dev;
-	sdmmc_disk.name = data->name;
-
+	sdmmc_disk.name = dev->name;
+	disk_nand_access_init(&sdmmc_disk);
 	return disk_access_register(&sdmmc_disk);
 }
 
+/*
 #define DISK_ACCESS_SDMMC_INIT(n)						\
 	static const struct sdmmc_config sdmmc_config_##n = {			\
 		.host_controller = DEVICE_DT_GET(DT_INST_PARENT(n)),		\
@@ -116,13 +207,17 @@ static int disk_sdmmc_init(const struct device *dev)
 		.name = CONFIG_SDMMC_VOLUME_NAME,				\
 	};									\
 										\
-	DEVICE_DT_INST_DEFINE(n,						\
-			&disk_sdmmc_init,					\
-			NULL,							\
-			&spi_nor_data_##n,					\
-			&spi_flash_config_##n,					\
-			POST_KERNEL,						\
-			CONFIG_SD_INIT_PRIORITY,				\
+
+*/
+
+
+	DEVICE_DT_INST_DEFINE(0,						
+			&disk_sdmmc_init,					
+			NULL,							
+			&spi_nor_data_0,					
+			&spi_flash_config_0,					
+			POST_KERNEL,						
+			80,				
 			NULL);
 
-DT_INST_FOREACH_STATUS_OKAY(DISK_ACCESS_SDMMC_INIT)
+//DT_INST_FOREACH_STATUS_OKAY(DISK_ACCESS_SDMMC_INIT)

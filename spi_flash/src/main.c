@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/flash.h>
 #include <zephyr/drivers/disk.h>
+#include <zephyr/storage/disk_access.h>
 #include "drivers/nand_disk.h"
 #include <zephyr/drivers/spi.h>
 #include <zephyr/device.h>
@@ -32,11 +33,18 @@ void test_cmd();
 #endif
 #define SPI_FLASH_SECTOR_SIZE        4096
 
+uint8_t expected[5000];
 
-void main(void)
+
+void main(void){
+	printf("Start\n");
+	main2();
+} 
+
+void main2(void)
 {
 	//test_cmd();
-	uint8_t expected[120];
+	
 	for (int i = 0; i < sizeof(expected); i++){
 		expected[i] = i % 9;
 	}
@@ -94,11 +102,9 @@ void main(void)
 	printf("Attempting to write %zu bytes\n", len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	
-
-	for (int i = 0; i < sizeof(expected); i++){
-		expected[i] = i % 4;
-	}
-	rc = disk_api->write(&sdmmc_disk, expected, 4, 0);
+	const char* disk_name = "mt29f8g01ad@0";
+	disk_access_write(disk_name, expected, 98, 0);
+	//rc = disk_api->write(&sdmmc_disk, expected, 4, 0);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
 		printf("Flash write failed! %d\n", rc);
@@ -106,7 +112,7 @@ void main(void)
 	}
 
 	memset(buf, 0, len);
-	rc = disk_api->read(&sdmmc_disk, buf, 1, 0);
+	//rc = disk_access_read(disk_name, buf, 4, 0);
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
 		printf("Flash read failed! %d\n", rc);
@@ -121,12 +127,13 @@ void main(void)
 		const uint8_t *rpe = rp + len;
 
 		printf("Data read does not match data written!!\n");
-		while (rp < rpe) {
+		/*while (rp < rpe) {
 			printf("%08x wrote %02x read %02x %s\n",
 			       (uint32_t)(SPI_FLASH_TEST_REGION_OFFSET + (rp - buf)),
 			       *wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
 			++rp;
 			++wp;
 		}
+		*/
 	}
 }
