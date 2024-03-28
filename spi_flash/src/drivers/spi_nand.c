@@ -256,7 +256,7 @@ static int spi_nor_access(const struct device *const dev, spi_send_request* requ
 
 	const struct spi_buf_set tx_set = {
 		.buffers = spi_buf,
-		.count = (request->addr_length > 0) ? 2 : 1,
+		.count = (request->data_length > 0) ? 2 : 1,
 	};
 
 	const struct spi_buf_set rx_set = {
@@ -416,13 +416,15 @@ int set_features(const struct device* dev, uint8_t register_select, uint8_t data
  */
 static int spi_nor_wait_until_ready(const struct device *dev)
 {
+	int waitcycles = 0;
 	int ret = 0;
 	uint8_t reg;
 
 	do {
+		waitcycles++;
 		reg = get_status(dev);
 	} while (!ret && (reg & SPI_NOR_WIP_BIT));
-
+	LOG_DBG("wait completed with %i cycles", waitcycles);
 	return ret;
 }
 
@@ -512,38 +514,40 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 		page_addr >> 8,
 		page_addr,
 	};
-	uint8_t buffer_address[] = {0, 0, 0};
+	uint8_t buffer_address[] = {0, 0};
 
-	spi_send_request cread_cinstr_cfg = {
-		.opcode = SPI_NOR_CMD_READ,
-		.addr = buffer_address,
-		.addr_length = 3,
-		.data = dest,
-		.data_length = SPI_NOR_PAGE_SIZE
-	};
-
-
+	
 	spi_send_request pread_cinstr_cfg = {
 		.opcode = SPI_NAND_PAGE_READ,
 		.addr = addr_buf,
 		.addr_length = 3,
 	};
 
+
+	spi_send_request cread_cinstr_cfg = {
+		.opcode = SPI_NOR_CMD_READ,
+		.addr = buffer_address,
+		.addr_length = 2,
+		.data = dest,
+		.data_length = 4000
+	};
+
 	res = spi_nor_access(dev, &pread_cinstr_cfg);
 	if (res != 0) {
-		LOG_DBG("read transfer error: %x", res);
+		LOG_WRN("read transfer error: %x", res);
 		goto out;
 	}
 	spi_nor_wait_until_ready(dev);
 
 	res = spi_nor_access(dev, &cread_cinstr_cfg);
 	if (res != 0) {
-		LOG_DBG("buffer transfer error: %x", res);
+		LOG_WRN("buffer transfer error: %x", res);
 		goto out;
 	}
 
 out:
-	LOG_DBG("finished read!");
+	uint8_t status = spi_nor_rdsr(dev);
+	LOG_DBG("finished read! with status %i", status);
 	release_device(dev);
 	return 0;
 }
@@ -587,9 +591,10 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 	spi_send_request pl_cinstr_cfg = {
 		.opcode = SPI_NAND_PL,
 		.addr = pl_addr_buf,
-		.addr_length = 3,
+		.addr_length = 2,
 		.data = src,
 		.data_length = size,
+		.is_write = true
 	};
 
 	spi_send_request pe_cinstr_cfg = {
@@ -622,7 +627,8 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 	LOG_DBG("execute completed!");
 	write_disable(dev);
 	release_device(dev);
-	LOG_DBG("write completed!");
+	uint8_t status = spi_nor_rdsr(dev);
+	LOG_DBG("write completed! with status %i", status);
 	
 	
 	return res;
