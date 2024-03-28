@@ -231,6 +231,7 @@ off_t convert_block_to_address(uint32_t block){
  */
 static int spi_nor_access(const struct device *const dev, spi_send_request* request)
 {
+
 	const struct spi_flash_config* const driver_cfg = dev->config;
 	struct spi_nor_data *const driver_data = dev->data;
 
@@ -321,6 +322,26 @@ static int write_disable(const struct device* dev){
 }
 
 
+int reset(const struct device* dev){
+
+	spi_cmd(dev, SPI_NAND_RESET, NULL, 0);
+	
+	//spi_nor_rdsr(dev);
+
+	return 0;
+}
+
+int set_die(const struct device* dev, int die_select){
+
+	uint8_t feature = 0x0;
+    if (die_select == 1) {
+		feature = 0x40;
+	}
+	set_features(dev, REGISTER_DIESELECT, feature);
+
+}
+
+
 uint8_t get_features(const struct device* dev, uint8_t register_select){
 
 	uint8_t data;
@@ -336,7 +357,6 @@ uint8_t get_features(const struct device* dev, uint8_t register_select){
 	int res = spi_nor_access(dev, &request);
 
 	if (res == 0){
-		LOG_DBG("sucess getting register ");
 		return data;
 	}
 	else {
@@ -451,7 +471,9 @@ static void release_device(const struct device *dev)
 uint8_t spi_nor_rdsr(const struct device *dev)
 {
 	uint8_t status = get_status(dev);
+	
 	LOG_DBG("status register: %d", status);
+	
 	return status;
 }
 
@@ -477,7 +499,8 @@ int spi_nor_wrsr(const struct device *dev,
 }
 
 int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
-
+	current_reads++;
+	acquire_device(dev);
 	LOG_DBG("reading bytes at address %d", page_addr);
 	nrfx_err_t res = 0;
 
@@ -521,13 +544,14 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 
 out:
 	LOG_DBG("finished read!");
+	release_device(dev);
 	return 0;
 }
 
 static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
 			size_t size)
 {
-	current_reads++;
+	
 	const size_t flash_size = dev_flash_size(dev);
 	int ret;
 
@@ -547,7 +571,8 @@ static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
 
 
 int spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size){
-	
+	current_writes++;
+	acquire_device(dev);
 	LOG_DBG("writing %d bytes at address %d", size, page_address);
 	nrfx_err_t res = 0;
 
@@ -577,6 +602,7 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 	res = spi_nor_access(dev, &pl_cinstr_cfg);
 	if (res != 0) {
 		LOG_WRN("load error: %x", res);
+		release_device(dev);
 		return res;
 	}
 
@@ -587,6 +613,7 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 	res = spi_nor_access(dev, &pe_cinstr_cfg);
 	if (res != 0){
 		LOG_WRN("lfm_start: %x", res);
+		release_device(dev);
 		return res;
 	}
 	// wait for operation to finish, issue the get feature command.
@@ -594,7 +621,9 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 	//k_sleep()
 	LOG_DBG("execute completed!");
 	write_disable(dev);
+	release_device(dev);
 	LOG_DBG("write completed!");
+	
 	
 	return res;
 
@@ -606,7 +635,7 @@ static int spi_nand_write(const struct device *dev, off_t addr,
 			 const void *src,
 			 size_t size)
 {
-	current_writes++;
+	
 	const size_t flash_size = dev_flash_size(dev);
 	const uint16_t page_size = dev_page_size(dev);
 	int ret = 0;
@@ -661,7 +690,7 @@ static int spi_nand_write(const struct device *dev, off_t addr,
 }
 
 int spi_nand_block_erase(const struct device * dev, off_t block_addr){
-
+	acquire_device(dev);
 	current_erases++;
 	uint8_t pe_addr_buf[] = {
 	block_addr >> 16,
@@ -675,9 +704,12 @@ int spi_nand_block_erase(const struct device * dev, off_t block_addr){
 		.addr_length = 3
 	};
 	write_enable(dev);
+
 	spi_nor_access(dev, &erase);
 	spi_nor_wait_until_ready(dev);
 	write_disable(dev);
+	
+	release_device(dev);
 	return 0;
 
 }
@@ -956,7 +988,9 @@ static int spi_configure(const struct device *dev)
 	 * that powers up with block protect enabled.
 	 */
 	acquire_device(dev);
+	
 	uint8_t status = spi_nor_rdsr(dev);
+	reset(dev);
 	release_device(dev);
 	LOG_DBG("status register: %d", status);
 	/*

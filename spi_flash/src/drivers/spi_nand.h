@@ -24,6 +24,7 @@
 #define SPI_NAND_GF 0x0F
 #define SPI_NAND_CMD_RDID 0x9F
 #define SPI_NAND_PAGE_READ 0x13
+#define SPI_NAND_RESET 0xFF
 
 //Configuration Registers 
 #define REGISTER_BLOCKLOCK 0xA0
