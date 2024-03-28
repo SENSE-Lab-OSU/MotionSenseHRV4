@@ -988,11 +988,16 @@ static int spi_configure(const struct device *dev)
 	 * that powers up with block protect enabled.
 	 */
 	acquire_device(dev);
-	
-	uint8_t status = spi_nor_rdsr(dev);
 	reset(dev);
+
+	uint8_t status = spi_nor_rdsr(dev);
+	uint8_t configuration = get_features(dev, REGISTER_CONFIGURATION);
+	uint8_t blocklock = get_features(dev, REGISTER_BLOCKLOCK);
+	LOG_INF("status register: %d", status);
+	LOG_INF("Configuration: %i", configuration);
+	LOG_INF("BlockLock: %i", blocklock);
 	release_device(dev);
-	LOG_DBG("status register: %d", status);
+	
 	/*
 	if (cfg->has_lock != 0) {
 		acquire_device(dev);
