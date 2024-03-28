@@ -103,7 +103,7 @@ void main2(void)
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	
 	const char* disk_name = "mt29f8g01ad@0";
-	disk_access_write(disk_name, expected, 98, 0);
+	disk_access_write(disk_name, expected, 5000, 0);
 	//rc = disk_api->write(&sdmmc_disk, expected, 4, 0);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
@@ -112,28 +112,36 @@ void main2(void)
 	}
 
 	memset(buf, 0, len);
-	//rc = disk_access_read(disk_name, buf, 4, 0);
+	rc = disk_access_read(disk_name, buf, 5000, 0);
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
 		printf("Flash read failed! %d\n", rc);
 		return;
 	}
+	bool print_results = true;
+	const uint8_t *wp = expected;
+	const uint8_t *rp = buf;
+	const uint8_t *rpe = rp + 100;
 
 	if (memcmp(expected, buf, len) == 0) {
 		printf("Data read matches data written. Good!!\n");
-	} else {
-		const uint8_t *wp = expected;
-		const uint8_t *rp = buf;
-		const uint8_t *rpe = rp + len;
-
-		printf("Data read does not match data written!!\n");
-		/*while (rp < rpe) {
+		while (rp < rpe && print_results) {
 			printf("%08x wrote %02x read %02x %s\n",
 			       (uint32_t)(SPI_FLASH_TEST_REGION_OFFSET + (rp - buf)),
 			       *wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
 			++rp;
 			++wp;
 		}
-		*/
+	} else {
+
+		printf("Data read does not match data written!!\n");
+		while (rp < rpe && print_results) {
+			printf("%08x wrote %02x read %02x %s\n",
+			       (uint32_t)(SPI_FLASH_TEST_REGION_OFFSET + (rp - buf)),
+			       *wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
+			++rp;
+			++wp;
+		}
+		
 	}
 }

@@ -85,7 +85,7 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 
 	off_t addr = convert_page_to_address(sector);
 	// Do we know what count means?
-	int ret = spi_nand_page_write(dev, addr, buf, count);
+	int ret = spi_nand_page_write(dev, addr, buf, 4000);
 	return ret; //sdmmc_write_blocks(&data->card, buf, sector, count);
 }
 
