@@ -72,8 +72,9 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 	off_t addr = convert_page_to_address(sector);
-	int ret = spi_nand_page_read(dev, addr, buf);
-
+	int ret = spi_nand_parameter_page_read(dev, buf);
+	//int ret = spi_nand_page_read(dev, addr, buf);
+	//lol
 	return ret; //sdmmc_read_blocks(&data->card, buf, sector, count);
 }
 

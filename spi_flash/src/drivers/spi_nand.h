@@ -263,6 +263,8 @@ uint8_t spi_nor_rdsr(const struct device *dev);
 int spi_nor_wrsr(const struct device *dev,
 			uint8_t sr);
 
+int spi_nand_parameter_page_read(const struct device* dev, void* dest);
+
 int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest);
 
 int spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size);
