@@ -500,7 +500,10 @@ int spi_nor_wrsr(const struct device *dev,
 	return ret;
 }
 
+int spi_unlock_memory(const struct device* dev){
 
+	set_features(dev, REGISTER_BLOCKLOCK, 0);
+}
 
 int spi_nand_parameter_page_read(const struct device* dev, void* dest){
 	
