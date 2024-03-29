@@ -500,6 +500,21 @@ int spi_nor_wrsr(const struct device *dev,
 	return ret;
 }
 
+
+
+int spi_nand_parameter_page_read(const struct device* dev, void* dest){
+	
+	uint8_t current_config = get_features(dev, REGISTER_CONFIGURATION);
+	uint8_t current_config_mask = current_config | 0x5; 
+	uint8_t code = current_config_mask & 0x3;
+	int ret = set_features(dev, REGISTER_CONFIGURATION, code);
+	spi_nand_page_read(dev, 0x01, dest);
+	ret = set_features(dev, REGISTER_CONFIGURATION, current_config);
+	
+	return ret;
+}
+
+
 int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 	current_reads++;
 	acquire_device(dev);
