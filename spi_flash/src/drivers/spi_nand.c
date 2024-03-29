@@ -250,7 +250,7 @@ static int spi_nor_access(const struct device *const dev, spi_send_request* requ
 
 	buf[0] = request->opcode;
 	if (request->addr_length > 0) {
-		memcpy(&buf[1], &request->addr, request->addr_length);
+		memcpy(&buf[1], request->addr, request->addr_length);
 		spi_buf[0].len += request->addr_length;
 	};
 
@@ -369,13 +369,13 @@ uint8_t get_features(const struct device* dev, uint8_t register_select){
 int set_features(const struct device* dev, uint8_t register_select, uint8_t data){
 	 
 	LOG_INF("setting features for value: %d", data);
-	uint8_t data_arr = {
+	uint8_t data_arr[] = {
 		register_select,
 		data
 
 	};
 	spi_send_request write_features_request = {
-		.opcode = SPI_NAND_GF,
+		.opcode = 0x1F,
 		.is_write = true,
 		.addr = &register_select,
 		.addr_length = 1,
@@ -383,10 +383,11 @@ int set_features(const struct device* dev, uint8_t register_select, uint8_t data
 		.data_length = 1
 	};
 
-	nrfx_err_t res = spi_nor_access(dev, &write_features_request);
+	int res = spi_nor_access(dev, &write_features_request);
 	if (res == 0){
-	if (get_features(dev, register_select) == data){
-		return 1;
+		uint8_t readback = get_features(dev, register_select);
+	if (readback == data){
+		return 0;
 	}
 	else{
 		return NRFX_ERROR_NOT_SUPPORTED;
@@ -500,7 +501,10 @@ int spi_nor_wrsr(const struct device *dev,
 	return ret;
 }
 
+int spi_unlock_memory(const struct device* dev){
 
+	set_features(dev, REGISTER_BLOCKLOCK, 0);
+}
 
 int spi_nand_parameter_page_read(const struct device* dev, void* dest){
 	
@@ -508,6 +512,7 @@ int spi_nand_parameter_page_read(const struct device* dev, void* dest){
 	uint8_t current_config_mask = current_config | 0x5; 
 	uint8_t code = current_config_mask & 0x3;
 	int ret = set_features(dev, REGISTER_CONFIGURATION, code);
+
 	spi_nand_page_read(dev, 0x01, dest);
 	ret = set_features(dev, REGISTER_CONFIGURATION, current_config);
 	
@@ -529,7 +534,7 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 		page_addr >> 8,
 		page_addr,
 	};
-	uint8_t buffer_address[] = {0, 0};
+	uint8_t buffer_address[] = {0, 0, 0};
 
 	
 	spi_send_request pread_cinstr_cfg = {
@@ -542,9 +547,9 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 	spi_send_request cread_cinstr_cfg = {
 		.opcode = SPI_NOR_CMD_READ,
 		.addr = buffer_address,
-		.addr_length = 2,
+		.addr_length = 3,
 		.data = dest,
-		.data_length = 4000
+		.data_length = 4096
 	};
 
 	res = spi_nor_access(dev, &pread_cinstr_cfg);
@@ -1010,7 +1015,8 @@ static int spi_configure(const struct device *dev)
 	 */
 	acquire_device(dev);
 	reset(dev);
-
+	spi_nor_wait_until_ready(dev);
+	spi_unlock_memory(dev);
 	uint8_t status = spi_nor_rdsr(dev);
 	uint8_t configuration = get_features(dev, REGISTER_CONFIGURATION);
 	uint8_t blocklock = get_features(dev, REGISTER_BLOCKLOCK);
