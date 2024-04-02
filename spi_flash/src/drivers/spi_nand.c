@@ -113,7 +113,7 @@ static inline uint32_t dev_flash_size(const struct device *dev)
 
 	return data->flash_size;
 #else /* CONFIG_SPI_NOR_SFDP_RUNTIME */
-	const struct spi_flash_config *cfg = dev->config;
+	const struct spi_flash_config* cfg = dev->config;
 
 	return cfg->flash_size;
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
@@ -715,9 +715,12 @@ static int spi_nand_write(const struct device *dev, off_t addr,
 	return ret;
 }
 
-int spi_nand_block_erase(const struct device * dev, off_t block_addr){
+int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 	acquire_device(dev);
 	current_erases++;
+
+	
+
 	uint8_t pe_addr_buf[] = {
 	block_addr >> 16,
 	block_addr >> 8,
@@ -737,6 +740,19 @@ int spi_nand_block_erase(const struct device * dev, off_t block_addr){
 	
 	release_device(dev);
 	return 0;
+
+}
+
+
+int spi_nand_chip_erase(const struct device* device) {
+	size_t size = dev_flash_size(device);
+	int block_count = (size / dev_page_size(device)) / 64;
+	block_count--;
+	block_count = 4096;
+	
+	for (int current_block = 0; current_block < block_count; current_block++){
+		convert_block_to_address(current_block);
+	}
 
 }
 
@@ -1165,3 +1181,5 @@ flash_nor_get_parameters(const struct device *dev)
 
 	return &flash_nor_parameters;
 }
+
+

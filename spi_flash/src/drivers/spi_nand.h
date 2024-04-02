@@ -17,6 +17,7 @@
 
 #define SPI_MAX_ID_LEN	3
 
+#define SPI_BLOCK_COUNT 4
 
 //Page Program
 #define SPI_NAND_PL 0x02
@@ -258,6 +259,10 @@ uint8_t get_features(const struct device* dev, uint8_t register_select);
 int set_features(const struct device* dev, uint8_t register_select, uint8_t data);
 
 
+/* Set the Die. if 0, use the first die, if 1, use the second. */
+int set_die(const struct device* dev, int die);
+
+
 uint8_t spi_nor_rdsr(const struct device *dev);
 
 int spi_nor_wrsr(const struct device *dev,
@@ -270,6 +275,8 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest);
 int spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size);
 
 int spi_nand_block_erase(const struct device * dev, off_t block_addr);
+
+int spi_nand_chip_erase(const struct device* device);
 
 int spi_init(const struct device *dev);
 

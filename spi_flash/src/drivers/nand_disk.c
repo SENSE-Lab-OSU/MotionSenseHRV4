@@ -11,10 +11,12 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/disk.h>
 #include <zephyr/devicetree.h>
+#include <zephyr/logging/log.h>
 #include "spi_nand.h"
 
 #define DT_DRV_COMPAT senselab_nanddisk
 
+LOG_MODULE_REGISTER(nand_disk, 3)
 
 enum sd_status {
 	SD_UNINIT,
@@ -47,6 +49,7 @@ static int disk_acess_init2(struct disk_info *disk){
 
 static int disk_nand_access_status(struct disk_info *disk)
 {
+	LOG_INF("Accessing Status");
 	const struct device* dev = disk->dev;
 	
 	/*const struct sdmmc_config* cfg = dev->config;
@@ -81,9 +84,10 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 				 uint32_t sector, uint32_t count)
 {
+	printf("count: %i", count);
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
-
+	
 	off_t addr = convert_page_to_address(sector);
 	// Do we know what count means?
 	int ret = spi_nand_page_write(dev, addr, buf, 4096);
@@ -92,6 +96,7 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 
 static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf)
 {
+	LOG_INF("Acessing ioctl with cmd %d", cmd);
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 

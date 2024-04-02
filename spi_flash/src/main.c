@@ -9,6 +9,7 @@
 #include <zephyr/drivers/disk.h>
 #include <zephyr/storage/disk_access.h>
 #include "drivers/nand_disk.h"
+#include "drivers/spi_nand.h"
 #include <zephyr/drivers/spi.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
@@ -87,6 +88,7 @@ void main2(void)
 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
 	 * SPI_FLASH_SECTOR_SIZE = flash size
 	 */
+	rc = spi_nand_block_erase(flash_dev, 0);
 	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
 	//		 SPI_FLASH_SECTOR_SIZE);
 	if (rc != 0) {
