@@ -16,7 +16,7 @@
 
 #define DT_DRV_COMPAT senselab_nanddisk
 
-LOG_MODULE_REGISTER(nand_disk, 3)
+LOG_MODULE_REGISTER(nand_disk, 3);
 
 enum sd_status {
 	SD_UNINIT,
