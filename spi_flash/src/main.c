@@ -88,7 +88,7 @@ void main2(void)
 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
 	 * SPI_FLASH_SECTOR_SIZE = flash size
 	 */
-	rc = spi_nand_block_erase(flash_dev, 0);
+	//rc = spi_nand_block_erase(flash_dev, 0);
 	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
 	//		 SPI_FLASH_SECTOR_SIZE);
 	if (rc != 0) {
@@ -105,7 +105,7 @@ void main2(void)
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	
 	const char* disk_name = "mt29f8g01ad@0";
-	disk_access_write(disk_name, expected, 22, 0);
+	disk_access_write(disk_name, expected, 8900, 0);
 	//rc = disk_api->write(&sdmmc_disk, expected, 4, 0);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
@@ -114,7 +114,7 @@ void main2(void)
 	}
 
 	memset(buf, 0, len);
-	rc = disk_access_read(disk_name, buf, 22, 0);
+	rc = disk_access_read(disk_name, buf, 8900, 0);
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
 		printf("Flash read failed! %d\n", rc);

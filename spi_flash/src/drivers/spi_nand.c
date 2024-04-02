@@ -719,7 +719,7 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 	acquire_device(dev);
 	current_erases++;
 
-	
+	LOG_DBG("erasing block at %d", block_addr);
 
 	uint8_t pe_addr_buf[] = {
 	block_addr >> 16,
