@@ -74,9 +74,17 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 {
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
-	off_t addr = convert_page_to_address(sector);
-	//int ret = spi_nand_parameter_page_read(dev, buf);
-	int ret = spi_nand_page_read(dev, addr, buf);
+	
+	if (count > 1){
+	LOG_WRN("count: %i", count);
+	}
+
+	off_t addr;
+	int ret = 0;
+	for (int x = 0; x < count; x++) {
+	addr = convert_page_to_address(sector);
+	ret = spi_nand_page_read(dev, addr, buf);
+	}
 	//lol
 	return ret; //sdmmc_read_blocks(&data->card, buf, sector, count);
 }
@@ -84,19 +92,24 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 				 uint32_t sector, uint32_t count)
 {
-	printf("count: %i", count);
+	if (count > 1){
+	LOG_WRN("count: %i", count);
+	}
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
-	
-	off_t addr = convert_page_to_address(sector);
+	int ret;
+	off_t addr;
 	// Do we know what count means?
-	int ret = spi_nand_page_write(dev, addr, buf, 4096);
+	for (int x = 0; x < count; x++){
+		addr = convert_page_to_address(sector+x);
+		ret = spi_nand_page_write(dev, addr, buf, 4096);
+	}
 	return ret; //sdmmc_write_blocks(&data->card, buf, sector, count);
 }
 
 static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf)
 {
-	LOG_INF("Acessing ioctl with cmd %d", cmd);
+	LOG_WRN("Acessing ioctl with cmd %d", cmd);
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 
