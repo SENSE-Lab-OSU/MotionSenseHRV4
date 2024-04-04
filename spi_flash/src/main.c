@@ -84,10 +84,12 @@ void main2(void)
 	 */
 	printf("\nTest 1: Flash erase\n");
 	k_sleep(K_MSEC(500));
-
+	
+	//detect_bad_blocks(flash_dev);
 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
 	 * SPI_FLASH_SECTOR_SIZE = flash size
 	 */
+	rc = spi_nand_chip_erase(flash_dev);
 	//rc = spi_nand_block_erase(flash_dev, 0);
 	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
 	//		 SPI_FLASH_SECTOR_SIZE);
@@ -99,14 +101,15 @@ void main2(void)
 
 	printf("\nTest 2: Flash write\n");
 
-	
+	//set_die(flash_dev, 0);
 
 	printf("Attempting to write %zu bytes\n", len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	
 	const char* disk_name = "mt29f8g01ad@0";
-	disk_access_write(disk_name, expected, 8900, 0);
+	//disk_access_write(disk_name, expected, 12, 1);
 	//rc = disk_api->write(&sdmmc_disk, expected, 4, 0);
+	//rc = spi_nand_page_write(flash_dev, 4, expected, len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
 		printf("Flash write failed! %d\n", rc);
@@ -114,7 +117,8 @@ void main2(void)
 	}
 
 	memset(buf, 0, len);
-	rc = disk_access_read(disk_name, buf, 8900, 0);
+	//rc = disk_access_read(disk_name, buf, 12, 1);
+	rc = spi_nand_page_read(flash_dev, 4, buf); 
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
 		printf("Flash read failed! %d\n", rc);

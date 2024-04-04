@@ -129,7 +129,7 @@ static inline uint16_t dev_page_size(const struct device *dev)
 #else /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 	const struct spi_nor_data *data = dev->data;
 
-	return data->page_size;
+	return 4096;
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 }
 
@@ -475,7 +475,7 @@ uint8_t spi_nor_rdsr(const struct device *dev)
 {
 	uint8_t status = get_status(dev);
 	
-	LOG_DBG("status register: %d", status);
+	//LOG_DBG("status register: %d", status);
 	
 	return status;
 }
@@ -505,6 +505,78 @@ int spi_unlock_memory(const struct device* dev){
 
 	set_features(dev, REGISTER_BLOCKLOCK, 0);
 }
+
+int detect_bad_blocks(const struct device* dev){
+	int page_addr = 0;
+	int bad_blocks = 0;
+	uint8_t dest;
+	off_t error_address = 4096;
+	int total_device_size = 3000;//(dev_flash_size(dev) / dev_page_size(dev)) / 64;
+	for (int x = 0; x < total_device_size; x++){
+	page_addr = convert_block_to_address(x);
+	acquire_device(dev);
+	current_reads++;
+	//LOG_DBG("reading bytes at address %d", page_addr);
+	nrfx_err_t res = 0;
+
+
+	__ASSERT(data != NULL, "null destination");
+
+	uint8_t addr_buf[] = {
+		page_addr >> 16,
+		page_addr >> 8,
+		page_addr,
+	};
+	
+	uint8_t buffer_address[] = {
+		error_address >> 16,
+		error_address >> 8,
+		error_address
+	};
+
+	
+	spi_send_request pread_cinstr_cfg = {
+		.opcode = SPI_NAND_PAGE_READ,
+		.addr = addr_buf,
+		.addr_length = 3,
+	};
+
+
+	spi_send_request cread_cinstr_cfg = {
+		.opcode = SPI_NOR_CMD_READ,
+		.addr = buffer_address,
+		.addr_length = 3,
+		.data = &dest,
+		.data_length = 1
+	};
+
+	res = spi_nor_access(dev, &pread_cinstr_cfg);
+	if (res != 0) {
+		LOG_WRN("read transfer error: %x", res);
+		continue;
+	}
+	spi_nor_wait_until_ready(dev);
+
+	res = spi_nor_access(dev, &cread_cinstr_cfg);
+	if (res != 0) {
+		LOG_WRN("buffer transfer error: %x", res);
+		continue;
+	}
+	uint8_t status = spi_nor_rdsr(dev);
+	if (status != 0){
+	LOG_WRN("finished read! with status %i", status);
+	}
+	release_device(dev);
+	//LOG_DBG("bad block value: %i", dest);
+	if (dest != 255){
+		bad_blocks++;
+	}
+	}
+	LOG_DBG("total bad blocks: %d", bad_blocks);
+	
+
+}
+
 
 int spi_nand_parameter_page_read(const struct device* dev, void* dest){
 	
@@ -644,10 +716,10 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 	// wait for operation to finish, issue the get feature command.
 	spi_nor_wait_until_ready(dev);
 	//k_sleep()
-	LOG_DBG("execute completed!");
+	uint8_t status = spi_nor_rdsr(dev);
 	write_disable(dev);
 	release_device(dev);
-	uint8_t status = spi_nor_rdsr(dev);
+	
 	LOG_DBG("write completed! with status %i", status);
 	
 	
@@ -720,7 +792,7 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 	current_erases++;
 
 	LOG_DBG("erasing block at %d", block_addr);
-
+	write_enable(dev);
 	uint8_t pe_addr_buf[] = {
 	block_addr >> 16,
 	block_addr >> 8,
@@ -732,28 +804,39 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 		.addr = block_addr,
 		.addr_length = 3
 	};
-	write_enable(dev);
+	
 
 	spi_nor_access(dev, &erase);
 	spi_nor_wait_until_ready(dev);
+	int status = spi_nor_rdsr(dev);
+	if (status != 0){
+	LOG_WRN("erase completed with status %i", status);
+	}
 	write_disable(dev);
 	
 	release_device(dev);
-	return 0;
+	return status;
 
 }
 
 
 int spi_nand_chip_erase(const struct device* device) {
 	size_t size = dev_flash_size(device);
+	off_t block_address;
+	int status = -1;
 	int block_count = (size / dev_page_size(device)) / 64;
 	block_count--;
 	block_count = 4096;
 	
 	for (int current_block = 0; current_block < block_count; current_block++){
-		convert_block_to_address(current_block);
+		block_address = convert_block_to_address(current_block);
+		status = spi_nand_block_erase(device, block_address);
+		if (status != 0){
+			break;
+		}
 	}
-
+	LOG_DBG("chip erase complete!"); 
+	return status;
 }
 
 
