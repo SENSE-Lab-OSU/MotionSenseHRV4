@@ -209,6 +209,8 @@ typedef struct spi_send_request {
  */
 struct spi_nor_data {
 	struct k_sem sem;
+
+	struct k_sem sem_inner;
 #if DT_INST_NODE_HAS_PROP(0, has_dpd)
 	/* Low 32-bits of uptime counter at which device last entered
 	 * deep power-down.

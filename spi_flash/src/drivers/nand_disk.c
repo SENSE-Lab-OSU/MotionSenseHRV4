@@ -65,7 +65,7 @@ static int disk_nand_access_status(struct disk_info *disk)
 		return DISK_STATUS_UNINIT;
 	}
 	*/
-	uint8_t status = spi_nor_rdsr(dev);
+	//uint8_t status = spi_nor_rdsr(dev);
 	return DISK_STATUS_OK;
 
 }
@@ -73,6 +73,7 @@ static int disk_nand_access_status(struct disk_info *disk)
 static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 				 uint32_t sector, uint32_t count)
 {
+	LOG_DBG("performing disk read");
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 	
@@ -82,10 +83,13 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 
 	off_t addr;
 	int ret = 0;
+	/*
 	for (int x = 0; x < count; x++) {
+	
 	addr = convert_page_to_address(sector);
 	ret = spi_nand_page_read(dev, addr, buf);
 	}
+	*/
 	//lol
 	return ret; //sdmmc_read_blocks(&data->card, buf, sector, count);
 }
@@ -93,6 +97,7 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 				 uint32_t sector, uint32_t count)
 {
+	LOG_DBG("performing disk write");
 	if (count > 1){
 	LOG_WRN("count: %i", count);
 	}
@@ -100,11 +105,13 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 	struct sdmmc_data *data = dev->data;
 	int ret;
 	off_t addr;
+	/*
 	// Do we know what count means?
 	for (int x = 0; x < count; x++){
 		addr = convert_page_to_address(sector+x);
 		ret = spi_nand_page_write(dev, addr, buf, 4096);
 	}
+	*/
 	return ret; //sdmmc_write_blocks(&data->card, buf, sector, count);
 }
 
@@ -129,7 +136,7 @@ static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf
 		 * Note that SD stack does not support enabling caching, so
 		 * cache flush is not required here
 		 */
-		return spi_nor_wait_until_ready(dev);
+		return 0; //spi_nor_wait_until_ready(dev);
 	default:
 		return -ENOTSUP;
 	}

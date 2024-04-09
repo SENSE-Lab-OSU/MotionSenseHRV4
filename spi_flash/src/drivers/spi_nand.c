@@ -214,7 +214,24 @@ off_t convert_block_to_address(uint32_t block){
 	return block* 64;
 }
 
+static void acquire_device_inner(const struct device *dev)
+{
+	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
+		struct spi_nor_data *const driver_data = dev->data;
 
+		k_sem_take(&driver_data->sem_inner, K_FOREVER);
+	}
+}
+
+static void release_device_inner(const struct device *dev)
+{
+
+	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
+		struct spi_nor_data* const driver_data = dev->data;
+
+		k_sem_give(&driver_data->sem_inner);
+	}
+}
 
 
 /*
@@ -231,11 +248,12 @@ off_t convert_block_to_address(uint32_t block){
  */
 static int spi_nor_access(const struct device *const dev, spi_send_request* request)
 {
-
+	acquire_device_inner(dev);
 	const struct spi_flash_config* const driver_cfg = dev->config;
 	struct spi_nor_data *const driver_data = dev->data;
 
-
+	int ret;
+	
 	uint8_t buf[5] = { 0 };
 	struct spi_buf spi_buf[2] = {
 		{
@@ -265,10 +283,13 @@ static int spi_nor_access(const struct device *const dev, spi_send_request* requ
 	};
 
 	if (request->is_write) {
-		return spi_write_dt(&driver_cfg->spi, &tx_set);
+		ret = spi_write_dt(&driver_cfg->spi, &tx_set);
+		release_device_inner(dev);
+		return ret;
 	}
-
-	return spi_transceive_dt(&driver_cfg->spi, &tx_set, &rx_set);
+	ret = spi_transceive_dt(&driver_cfg->spi, &tx_set, &rx_set);
+	release_device_inner(dev);
+	return ret;
 }
 
 static int spi_cmd(const struct device* dev, uint8_t opcode, void* dest, size_t length){
@@ -446,6 +467,8 @@ static void acquire_device(const struct device *dev)
 
 }
 
+
+
 /* Everything necessary to release access to the device.
  *
  * This means (optionally) putting the device into deep power-down
@@ -460,6 +483,9 @@ static void release_device(const struct device *dev)
 		k_sem_give(&driver_data->sem);
 	}
 }
+
+
+
 
 /**
  * @brief Read the status register.
@@ -1230,6 +1256,7 @@ int spi_init(const struct device *dev)
 		struct spi_nor_data* const driver_data = dev->data;
 
 		k_sem_init(&driver_data->sem, 1, K_SEM_MAX_LIMIT);
+		k_sem_init(&driver_data->sem_inner, 1, K_SEM_MAX_LIMIT);
 	}
 
 	return spi_configure(dev);
