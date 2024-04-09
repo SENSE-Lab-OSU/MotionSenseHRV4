@@ -13,7 +13,7 @@
 #include <zephyr/fs/fs.h>
 #include <stdio.h>
 
-LOG_MODULE_REGISTER(main);
+LOG_MODULE_REGISTER(file_mount);
 
 #if CONFIG_DISK_DRIVER_FLASH
 #include <zephyr/storage/flash_map.h>
@@ -166,7 +166,10 @@ static int mount_app_fs(struct fs_mount_t *mnt)
 #elif CONFIG_FILE_SYSTEM_LITTLEFS
 	mnt->type = FS_LITTLEFS;
 	mnt->mnt_point = "/lfs";
+	//storage.backend 
+	mnt->storage_dev = "mt29f8g01ad@0";
 	mnt->fs_data = &storage;
+	mnt->flags = FS_MOUNT_FLAG_USE_DISK_ACCESS;
 #endif
 	rc = fs_mount(mnt);
 

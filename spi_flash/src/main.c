@@ -36,10 +36,12 @@ void test_cmd();
 
 uint8_t expected[4096];
 
+int storage_main(void);
 
 void main(void){
 	printf("Start\n");
-	main2();
+	storage_main();
+	//main2();
 } 
 
 void main2(void)
