@@ -122,13 +122,13 @@ static inline uint32_t dev_flash_size(const struct device *dev)
 /* Get the flash device page size.  Constant for minimal, data for
  * runtime and devicetree.
  */
-static inline uint16_t dev_page_size(const struct device *dev)
+inline uint16_t dev_page_size(const struct device *dev)
 {
 #ifdef CONFIG_SPI_NOR_SFDP_MINIMAL
 	return 256;
 #else /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 	const struct spi_nor_data *data = dev->data;
-
+	uint16_t size = data->page_size;
 	return 4096;
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 }
@@ -415,7 +415,7 @@ int set_features(const struct device* dev, uint8_t register_select, uint8_t data
  * @param dev The device structure
  * @return 0 on success, negative errno code otherwise
  */
-static int spi_nor_wait_until_ready(const struct device *dev)
+int spi_nor_wait_until_ready(const struct device *dev)
 {
 	int waitcycles = 0;
 	int ret = 0;

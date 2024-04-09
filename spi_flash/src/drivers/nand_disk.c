@@ -13,6 +13,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
 #include "spi_nand.h"
+#include "nand_disk.h"
 
 #define DT_DRV_COMPAT senselab_nanddisk
 
@@ -112,53 +113,27 @@ static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf
 	LOG_WRN("Acessing ioctl with cmd %d", cmd);
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
-	dhara_error_t err;
 
     switch (cmd) {
-        case CTRL_SYNC:;
-            ;
-            int ret = dhara_map_sync(&map, &err);
-            if (ret) {
-                shell_printf_line("dhara sync failed: %d, error: %d", ret, err);
-                return RES_ERROR;
-            }
-            break;
-        case GET_SECTOR_COUNT:;
-            ;
-            dhara_sector_t sector_count = dhara_map_capacity(&map);
-            shell_printf_line("dhara capacity: %d", sector_count);
-            LBA_t *sector_count_out = (LBA_t *)buff;
-            *sector_count_out = sector_count;
-            break;
-        case GET_SECTOR_SIZE:
-            ;
-            WORD *sector_size_out = (WORD *)buff;
-            *sector_size_out = SPI_NAND_PAGE_SIZE;
-            break;
-        case GET_BLOCK_SIZE:
-            ;
-            DWORD *block_size_out = (DWORD *)buff;
-            *block_size_out = SPI_NAND_PAGES_PER_BLOCK;
-            break;
-        case CTRL_TRIM:
-            ;
-            LBA_t *args = (LBA_t *)buff;
-            LBA_t start = args[0];
-            LBA_t end = args[1];
-            while (start <= end) {
-                int ret = dhara_map_trim(&map, start, &err);
-                if (ret) {
-                    shell_printf_line("dhara trim failed: %d, error: %d", ret, err);
-                    return RES_ERROR;
-                }
-                start++;
-            }
-            break;
-        default:
-            return RES_PARERR;
-    }
-
-    return RES_OK;
+	case DISK_IOCTL_GET_SECTOR_COUNT:
+		(*(uint32_t *)buf) = 5000;
+		break;
+	case DISK_IOCTL_GET_SECTOR_SIZE:
+		(*(uint32_t *)buf) = dev_page_size(dev); 
+		break;
+	case DISK_IOCTL_GET_ERASE_BLOCK_SZ:
+		(*(uint32_t *)buf) = dev_page_size(dev)*64;
+		break;
+	case DISK_IOCTL_CTRL_SYNC:
+		/* Ensure card is not busy with data write.
+		 * Note that SD stack does not support enabling caching, so
+		 * cache flush is not required here
+		 */
+		return spi_nor_wait_until_ready(dev);
+	default:
+		return -ENOTSUP;
+	}
+	return 0;
 
 
 	return 0; //sdmmc_ioctl(&data->card, cmd, buf);

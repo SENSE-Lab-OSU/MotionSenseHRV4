@@ -246,7 +246,9 @@ struct spi_nor_data {
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 };
 
+uint16_t dev_page_size(const struct device *dev);
 
+int spi_nor_wait_until_ready(const struct device *dev);
 
 off_t convert_to_address(uint32_t page, uint32_t block);
 
@@ -277,6 +279,8 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest);
 int spi_nand_page_write(const struct device* dev, off_t page_address, const void* src, size_t size);
 
 int spi_nand_block_erase(const struct device * dev, off_t block_addr);
+
+ 
 
 int spi_nand_chip_erase(const struct device* device);
 
