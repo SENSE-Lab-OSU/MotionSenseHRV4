@@ -211,7 +211,8 @@ off_t convert_page_to_address(uint32_t page){
 }
 
 off_t convert_block_to_address(uint32_t block){
-	return block* 64;
+	//werid fix because of noticed offsets, perhaps there is another issue we are unaware of.
+	return ((block+1) * 64) + 1;
 }
 
 static void acquire_device_inner(const struct device *dev)
@@ -729,7 +730,7 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 		return res;
 	}
 
-	LOG_DBG("load completed!");
+	//LOG_DBG("load completed!");
 
 	//Start Execute Process
 
@@ -847,21 +848,27 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 
 
 int spi_nand_chip_erase(const struct device* device) {
+	
+
+	set_die(device, 0);
 	size_t size = dev_flash_size(device);
 	off_t block_address;
 	int status = -1;
-	int block_count = (size / dev_page_size(device)) / 64;
+	int page_size = dev_page_size(device);
+	int block_count = (size / page_size);
+	block_count /= 64;
 	block_count--;
-	block_count = 4096;
-	
+	//block_count = 4096;
+	LOG_INF("chip erase start, for %i blocks", block_count);
 	for (int current_block = 0; current_block < block_count; current_block++){
 		block_address = convert_block_to_address(current_block);
 		status = spi_nand_block_erase(device, block_address);
 		if (status != 0){
+			LOG_WRN("error in chip erase: %i", status);
 			break;
 		}
 	}
-	LOG_DBG("chip erase complete!"); 
+	LOG_INF("chip erase complete! with status, %i", status); 
 	return status;
 }
 

@@ -17,7 +17,7 @@
 
 #define DT_DRV_COMPAT senselab_nanddisk
 
-LOG_MODULE_REGISTER(nand_disk, 3);
+LOG_MODULE_REGISTER(nand_disk, 4);
 
 enum sd_status {
 	SD_UNINIT,
@@ -34,6 +34,26 @@ struct sdmmc_data {
 	enum sd_status status;
 	char *name;
 };
+
+
+// Config sector monitoring
+int sector_write_list[500] = { 0 };
+int unique_sectors_written = 0;
+
+char sector_1_buffer[4096];
+char sector_2_buffer[4096];
+
+static int duplicate_sector_access(int sector_num){
+	for (int i = 0; i < unique_sectors_written; i++){
+		if (sector_write_list[i] == sector_num){
+			LOG_WRN("error: attempted duplicate write for sector %i", sector_num);
+			return -1;
+		}
+	}
+	sector_write_list[unique_sectors_written] = sector_num;
+	unique_sectors_written++;
+	return 0;
+}
 
 
 static int disk_nand_access_init(struct disk_info *disk)
@@ -73,23 +93,31 @@ static int disk_nand_access_status(struct disk_info *disk)
 static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 				 uint32_t sector, uint32_t count)
 {
-	LOG_DBG("performing disk read");
+
+
+	LOG_DBG("performing disk read at sector %i", sector);
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 	
+	if (sector == 1){
+		memcpy(buf, sector_1_buffer, 4096);
+	}
+	else if (sector == 2){
+		memcpy(buf, sector_2_buffer, 4096);
+	}
+
 	if (count > 1){
 	LOG_WRN("count: %i", count);
 	}
 
 	off_t addr;
 	int ret = 0;
-	/*
-	for (int x = 0; x < count; x++) {
 	
+	for (int x = 0; x < count; x++) {
 	addr = convert_page_to_address(sector);
 	ret = spi_nand_page_read(dev, addr, buf);
 	}
-	*/
+	
 	//lol
 	return ret; //sdmmc_read_blocks(&data->card, buf, sector, count);
 }
@@ -97,7 +125,7 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 				 uint32_t sector, uint32_t count)
 {
-	LOG_DBG("performing disk write");
+	LOG_DBG("performing disk write at sector %i", sector);
 	if (count > 1){
 	LOG_WRN("count: %i", count);
 	}
@@ -105,13 +133,24 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 	struct sdmmc_data *data = dev->data;
 	int ret;
 	off_t addr;
-	/*
+	
 	// Do we know what count means?
+	if (sector == 1){
+		memcpy(sector_1_buffer, buf, 4096);
+	}
+	else if (sector == 2){
+		memcpy(sector_2_buffer, buf, 4096);
+	}else {
+	duplicate_sector_access(sector);
+	}
+
 	for (int x = 0; x < count; x++){
 		addr = convert_page_to_address(sector+x);
 		ret = spi_nand_page_write(dev, addr, buf, 4096);
+		
 	}
-	*/
+	
+	
 	return ret; //sdmmc_write_blocks(&data->card, buf, sector, count);
 }
 
@@ -238,10 +277,10 @@ static int disk_sdmmc_init(const struct device *dev)
 	//data->status = SD_UNINIT;
 
 	//spi_nor_data* nand_data = dev->data;
-	
+	LOG_INF("Initializing disk Registration"); 
 
 	sdmmc_disk.dev = dev;
-	sdmmc_disk.name = dev->name;
+	sdmmc_disk.name = "SD";//dev->name;
 	disk_nand_access_init(&sdmmc_disk);
 	return disk_access_register(&sdmmc_disk);
 }

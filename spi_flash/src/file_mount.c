@@ -7,13 +7,11 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/usb/usb_device.h>
-#include <zephyr/usb/usbd.h>
-#include <zephyr/usb/class/usbd_msc.h>
+
 #include <zephyr/fs/fs.h>
 #include <stdio.h>
 
-LOG_MODULE_REGISTER(file_mount);
+LOG_MODULE_REGISTER(file_mount, 4);
 
 #if CONFIG_DISK_DRIVER_FLASH
 #include <zephyr/storage/flash_map.h>
@@ -27,6 +25,7 @@ LOG_MODULE_REGISTER(file_mount);
 #include <zephyr/fs/littlefs.h>
 FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 #endif
+
 
 #define STORAGE_PARTITION		storage_partition
 #define STORAGE_PARTITION_ID		FIXED_PARTITION_ID(STORAGE_PARTITION)
@@ -118,6 +117,26 @@ static int enable_usb_device_next(void)
 }
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK_NEXT) */
 
+
+void create_test_files(){
+	printk("trying to write files...\n");
+	struct fs_file_t test_file;
+	fs_file_t_init(&test_file);
+	char destination[50] = "";
+	struct fs_mount_t* mp = &fs_mnt;
+	strcat(destination, mp->mnt_point);
+	strcat(destination, "/test.txt"); 
+	int file_create = fs_open(&test_file, destination, FS_O_CREATE | FS_O_WRITE);
+	if (file_create == 0){
+		char a[] = "hello world";
+		printk("trying to write...\n");
+		fs_write(&test_file, a, sizeof(a));
+		printk("done writing\n");
+		fs_close(&test_file);
+	}
+}
+
+
 static int setup_flash(struct fs_mount_t *mnt)
 {
 	int rc = 0;
@@ -152,7 +171,7 @@ static int mount_app_fs(struct fs_mount_t *mnt)
 
 #if CONFIG_FAT_FILESYSTEM_ELM
 	static FATFS fat_fs;
-
+	
 	mnt->type = FS_FATFS;
 	mnt->fs_data = &fat_fs;
 	if (IS_ENABLED(CONFIG_DISK_DRIVER_RAM)) {
@@ -162,15 +181,18 @@ static int mount_app_fs(struct fs_mount_t *mnt)
 	} else {
 		mnt->mnt_point = "/NAND:";
 	}
-
+	mnt->mnt_point = "/SD:";
+	//mnt->storage_dev = "REM";
+	
 #elif CONFIG_FILE_SYSTEM_LITTLEFS
 	mnt->type = FS_LITTLEFS;
 	mnt->mnt_point = "/lfs";
 	//storage.backend 
-	mnt->storage_dev = "mt29f8g01ad@0";
+	mnt->storage_dev = "SD";
 	mnt->fs_data = &storage;
 	mnt->flags = FS_MOUNT_FLAG_USE_DISK_ACCESS;
 #endif
+	LOG_INF("start mount");
 	rc = fs_mount(mnt);
 
 	return rc;
@@ -178,6 +200,7 @@ static int mount_app_fs(struct fs_mount_t *mnt)
 
 static void setup_disk(void)
 {
+
 	struct fs_mount_t *mp = &fs_mnt;
 	struct fs_dir_t dir;
 	struct fs_statvfs sbuf;
@@ -209,7 +232,11 @@ static void setup_disk(void)
 	k_sleep(K_MSEC(50));
 
 	printk("Mount %s: %d\n", fs_mnt.mnt_point, rc);
-
+	for (int x = 0; x < 1; x++){
+	create_test_files();
+	k_sleep(K_SECONDS(1));
+	}
+	
 	rc = fs_statvfs(mp->mnt_point, &sbuf);
 	if (rc < 0) {
 		printk("FAIL: statvfs: %d\n", rc);
@@ -227,8 +254,10 @@ static void setup_disk(void)
 
 	if (rc < 0) {
 		LOG_ERR("Failed to open directory");
+	
 	}
-
+	
+	
 	while (rc >= 0) {
 		struct fs_dirent ent = { 0 };
 
@@ -248,7 +277,7 @@ static void setup_disk(void)
 	}
 
 	(void)fs_closedir(&dir);
-
+	
 	return;
 }
 
@@ -261,7 +290,7 @@ int storage_main(void)
 #if defined(CONFIG_USB_DEVICE_STACK_NEXT)
 	ret = enable_usb_device_next();
 #else
-	ret = usb_enable(NULL);
+	//ret = usb_enable(NULL);
 #endif
 	if (ret != 0) {
 		LOG_ERR("Failed to enable USB");
