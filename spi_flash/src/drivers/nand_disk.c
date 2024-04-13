@@ -101,9 +101,11 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 	
 	if (sector == 1){
 		memcpy(buf, sector_1_buffer, 4096);
+		return 0;
 	}
 	else if (sector == 2){
 		memcpy(buf, sector_2_buffer, 4096);
+		return 0;
 	}
 
 	if (count > 1){
@@ -137,9 +139,11 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 	// Do we know what count means?
 	if (sector == 1){
 		memcpy(sector_1_buffer, buf, 4096);
+		return 0;
 	}
 	else if (sector == 2){
 		memcpy(sector_2_buffer, buf, 4096);
+		return 0;
 	}else {
 	duplicate_sector_access(sector);
 	}
