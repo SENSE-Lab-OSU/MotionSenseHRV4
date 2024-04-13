@@ -108,7 +108,7 @@ void main2(bool chip_erase)
 
 	printf("\nTest 2: Flash write\n");
 
-	set_die(flash_dev, 0);
+	//set_die(flash_dev, 0);
 
 	printf("Attempting to write %zu bytes\n", len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
@@ -134,7 +134,7 @@ void main2(bool chip_erase)
 	// 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
 
 	memset(buf, 0, len);
-	rc = disk_access_read(disk_name, buf, 1, 1);
+	rc = disk_access_read(disk_name, buf, 0, 1);
 	//rc = spi_nand_page_read(flash_dev, 4, buf); 
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {

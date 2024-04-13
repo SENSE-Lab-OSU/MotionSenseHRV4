@@ -850,7 +850,7 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 int spi_nand_chip_erase(const struct device* device) {
 	
 
-	set_die(device, 0);
+	//set_die(device, 0);
 	size_t size = dev_flash_size(device);
 	off_t block_address;
 	int status = -1;
