@@ -43,7 +43,7 @@ void main(void){
 	k_sleep(K_SECONDS(2));
 	main2(true);
 	k_sleep(K_SECONDS(2));
-	storage_main();
+	//storage_main();
 	
 } 
 
@@ -57,7 +57,7 @@ void main2(bool chip_erase)
 	const size_t len = sizeof(expected);
 	uint8_t buf[sizeof(expected)];
 	const struct device *flash_dev;
-	int rc;
+	int rc = 0;
 
 	const struct device* test_qspi_dev = DEVICE_DT_GET(DT_NODELABEL(gpio1));
 	printk("got first device");
@@ -95,20 +95,23 @@ void main2(bool chip_erase)
 	 * SPI_FLASH_SECTOR_SIZE = flash size
 	 */
 	if (chip_erase){
+	set_die(flash_dev, 1);
 	rc = spi_nand_chip_erase(flash_dev);
-	}
-	//rc = spi_nand_block_erase(flash_dev, 65);
-	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
-	//		 SPI_FLASH_SECTOR_SIZE);
 	if (rc != 0) {
 		printf("Flash erase failed! %d\n", rc);
 	} else {
 		printf("Flash erase succeeded!\n");
 	}
+	}
+	set_die(flash_dev, 0);
+	//rc = spi_nand_block_erase(flash_dev, 65);
+	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
+	//		 SPI_FLASH_SECTOR_SIZE);
+	
 
 	printf("\nTest 2: Flash write\n");
 
-	//set_die(flash_dev, 0);
+	
 
 	printf("Attempting to write %zu bytes\n", len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
@@ -116,11 +119,11 @@ void main2(bool chip_erase)
 	
 	const char* disk_name = "SD";
 	
-	/*
-	for (int x = 20; x < 65; x++){
+	
+	/*for (int x = 25; x < 65; x++){
 	disk_access_write(disk_name, expected, x, 1);
-	}
-	*/
+	}*/
+	
 	
 	
 	//rc = disk_api->write(&sdmmc_disk, expected, 4, 0);
@@ -128,13 +131,12 @@ void main2(bool chip_erase)
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
 		printf("Flash write failed! %d\n", rc);
-		return;
 	}
 
 	// 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
 
 	memset(buf, 0, len);
-	rc = disk_access_read(disk_name, buf, 0, 1);
+	rc = disk_access_read(disk_name, buf, 30, 1);
 	//rc = spi_nand_page_read(flash_dev, 4, buf); 
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {

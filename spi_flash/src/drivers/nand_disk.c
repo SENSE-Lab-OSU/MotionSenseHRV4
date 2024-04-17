@@ -37,11 +37,11 @@ struct sdmmc_data {
 
 
 // Config sector monitoring
-int sector_write_list[500] = { 0 };
+int sector_write_list[5000] = { 0 };
 int unique_sectors_written = 0;
 
-char sector_1_buffer[4096];
-char sector_2_buffer[4096];
+char sector_buffer[23][4096];
+int file_table_sector_num = 20;
 
 static int duplicate_sector_access(int sector_num){
 	for (int i = 0; i < unique_sectors_written; i++){
@@ -99,14 +99,12 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 	
-	if (sector == 1){
-		memcpy(buf, sector_1_buffer, 4096);
+	if (sector < file_table_sector_num){
+		memcpy(buf, sector_buffer[sector], 4096);
 		return 0;
 	}
-	else if (sector == 2){
-		memcpy(buf, sector_2_buffer, 4096);
-		return 0;
-	}
+	
+	
 
 	if (count > 1){
 	LOG_WRN("count: %i", count);
@@ -137,14 +135,11 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 	off_t addr;
 	
 	// Do we know what count means?
-	if (sector == 1){
-		memcpy(sector_1_buffer, buf, 4096);
+	if (sector < file_table_sector_num){
+		memcpy(sector_buffer[sector], buf, 4096);
 		return 0;
 	}
-	else if (sector == 2){
-		memcpy(sector_2_buffer, buf, 4096);
-		return 0;
-	}else {
+	else {
 	duplicate_sector_access(sector);
 	}
 
@@ -160,13 +155,13 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 
 static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf)
 {
-	LOG_WRN("Acessing ioctl with cmd %d", cmd);
+	LOG_INF("Acessing ioctl with cmd %d", cmd);
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 
     switch (cmd) {
 	case DISK_IOCTL_GET_SECTOR_COUNT:
-		(*(uint32_t *)buf) = 5000;
+		(*(uint32_t *)buf) = 64*2000;
 		break;
 	case DISK_IOCTL_GET_SECTOR_SIZE:
 		(*(uint32_t *)buf) = dev_page_size(dev); 

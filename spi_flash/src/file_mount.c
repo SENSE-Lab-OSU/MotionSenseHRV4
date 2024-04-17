@@ -9,6 +9,7 @@
 #include <zephyr/logging/log.h>
 
 #include <zephyr/fs/fs.h>
+#include <zephyr/random/rand32.h>
 #include <stdio.h>
 
 LOG_MODULE_REGISTER(file_mount, 4);
@@ -122,16 +123,24 @@ void create_test_files(){
 	printk("trying to write files...\n");
 	struct fs_file_t test_file;
 	fs_file_t_init(&test_file);
-	char destination[50] = "";
+	char destination[80] = "";
+	int ID = 0;
+	ID = sys_rand32_get() % 90000;
+	char IDString[8];
+	itoa(ID, IDString,  10);
 	struct fs_mount_t* mp = &fs_mnt;
 	strcat(destination, mp->mnt_point);
-	strcat(destination, "/test.txt"); 
+	strcat(destination, "/");
+	//fs_mkdir(destination)
+	strcat(destination, IDString);
+	strcat(destination, "l.txt"); 
+	
 	int file_create = fs_open(&test_file, destination, FS_O_CREATE | FS_O_WRITE);
 	if (file_create == 0){
-		char a[] = "hello world";
-		printk("trying to write...\n");
+		char a[4000] = "hello world dwuaih i dwhuai hduiw ahudiw ahuid hwuai hduwia hudiwa htf htf htf htfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtf";
+		//printk("trying to write...\n");
 		fs_write(&test_file, a, sizeof(a));
-		printk("done writing\n");
+		//printk("done writing\n");
 		fs_close(&test_file);
 	}
 }
@@ -232,9 +241,9 @@ static void setup_disk(void)
 	k_sleep(K_MSEC(50));
 
 	printk("Mount %s: %d\n", fs_mnt.mnt_point, rc);
-	for (int x = 0; x < 1; x++){
+	for (int x = 0; x < 1000; x++){
 	create_test_files();
-	k_sleep(K_SECONDS(1));
+	k_sleep(K_SECONDS(.1));
 	}
 	
 	rc = fs_statvfs(mp->mnt_point, &sbuf);
@@ -274,6 +283,7 @@ static void setup_disk(void)
 		       (ent.type == FS_DIR_ENTRY_FILE) ? 'F' : 'D',
 		       ent.size,
 		       ent.name);
+			   k_sleep(K_SECONDS(.25));
 	}
 
 	(void)fs_closedir(&dir);
@@ -290,7 +300,7 @@ int storage_main(void)
 #if defined(CONFIG_USB_DEVICE_STACK_NEXT)
 	ret = enable_usb_device_next();
 #else
-	//ret = usb_enable(NULL);
+	ret = usb_enable(NULL);
 #endif
 	if (ret != 0) {
 		LOG_ERR("Failed to enable USB");
