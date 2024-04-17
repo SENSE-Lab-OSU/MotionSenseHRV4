@@ -43,7 +43,7 @@ void main(void){
 	k_sleep(K_SECONDS(2));
 	main2(true);
 	k_sleep(K_SECONDS(2));
-	//storage_main();
+	storage_main();
 	
 } 
 
@@ -95,7 +95,6 @@ void main2(bool chip_erase)
 	 * SPI_FLASH_SECTOR_SIZE = flash size
 	 */
 	if (chip_erase){
-	set_die(flash_dev, 1);
 	rc = spi_nand_chip_erase(flash_dev);
 	if (rc != 0) {
 		printf("Flash erase failed! %d\n", rc);
@@ -103,7 +102,7 @@ void main2(bool chip_erase)
 		printf("Flash erase succeeded!\n");
 	}
 	}
-	set_die(flash_dev, 0);
+	//set_die(flash_dev, 0);
 	//rc = spi_nand_block_erase(flash_dev, 65);
 	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
 	//		 SPI_FLASH_SECTOR_SIZE);

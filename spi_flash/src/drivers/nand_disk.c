@@ -40,8 +40,8 @@ struct sdmmc_data {
 int sector_write_list[5000] = { 0 };
 int unique_sectors_written = 0;
 
-char sector_buffer[23][4096];
-int file_table_sector_num = 20;
+char sector_buffer[40][4096];
+int file_table_sector_num = 40;
 
 static int duplicate_sector_access(int sector_num){
 	for (int i = 0; i < unique_sectors_written; i++){
@@ -85,7 +85,7 @@ static int disk_nand_access_status(struct disk_info *disk)
 		return DISK_STATUS_UNINIT;
 	}
 	*/
-	//uint8_t status = spi_nor_rdsr(dev);
+	//uint8_t status = spi_rdsr(dev);
 	return DISK_STATUS_OK;
 
 }

@@ -118,14 +118,15 @@ static int enable_usb_device_next(void)
 }
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK_NEXT) */
 
-
+int IDCounter = 0;
 void create_test_files(){
-	printk("trying to write files...\n");
+	//printk("trying to write files...\n");
 	struct fs_file_t test_file;
 	fs_file_t_init(&test_file);
 	char destination[80] = "";
 	int ID = 0;
-	ID = sys_rand32_get() % 90000;
+	ID = IDCounter;
+	IDCounter++;
 	char IDString[8];
 	itoa(ID, IDString,  10);
 	struct fs_mount_t* mp = &fs_mnt;
@@ -241,9 +242,15 @@ static void setup_disk(void)
 	k_sleep(K_MSEC(50));
 
 	printk("Mount %s: %d\n", fs_mnt.mnt_point, rc);
-	for (int x = 0; x < 1000; x++){
-	create_test_files();
-	k_sleep(K_SECONDS(.1));
+
+	char folder_location[12];
+	strcat(folder_location, mp->mnt_point);
+	strcat(folder_location, "/ac");
+	fs_mkdir(folder_location);
+	printk("folder created, now creating files");
+	for (int x = 0; x < 50; x++){
+		create_test_files();
+	//k_sleep(K_SECONDS(.1));
 	}
 	
 	rc = fs_statvfs(mp->mnt_point, &sbuf);
@@ -283,9 +290,13 @@ static void setup_disk(void)
 		       (ent.type == FS_DIR_ENTRY_FILE) ? 'F' : 'D',
 		       ent.size,
 		       ent.name);
-			   k_sleep(K_SECONDS(.25));
+			   k_sleep(K_SECONDS(.1));
 	}
-
+	printk("%s: bsize = %lu ; frsize = %lu ;"
+	       " blocks = %lu ; bfree = %lu\n",
+	       mp->mnt_point,
+	       sbuf.f_bsize, sbuf.f_frsize,
+	       sbuf.f_blocks, sbuf.f_bfree);
 	(void)fs_closedir(&dir);
 	
 	return;
@@ -306,6 +317,7 @@ int storage_main(void)
 		LOG_ERR("Failed to enable USB");
 		return 0;
 	}
+	LOG_INF("USB is in Mass storage mode");
 
 	
 }

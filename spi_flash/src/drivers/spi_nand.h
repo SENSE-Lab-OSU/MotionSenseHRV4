@@ -250,7 +250,7 @@ struct spi_nor_data {
 
 uint16_t dev_page_size(const struct device *dev);
 
-int spi_nor_wait_until_ready(const struct device *dev);
+int spi_flash_wait_until_ready(const struct device *dev);
 
 off_t convert_to_address(uint32_t page, uint32_t block);
 
@@ -267,7 +267,7 @@ int set_features(const struct device* dev, uint8_t register_select, uint8_t data
 int set_die(const struct device* dev, int die);
 
 
-uint8_t spi_nor_rdsr(const struct device *dev);
+uint8_t spi_rdsr(const struct device *dev);
 
 int spi_nor_wrsr(const struct device *dev,
 			uint8_t sr);
@@ -283,8 +283,9 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 int spi_nand_block_erase(const struct device * dev, off_t block_addr);
 
  
-
 int spi_nand_chip_erase(const struct device* device);
+
+int spi_nand_whole_chip_erase(const struct device* dev);
 
 int spi_init(const struct device *dev);
 

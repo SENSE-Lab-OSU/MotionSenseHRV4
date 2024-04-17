@@ -348,7 +348,7 @@ int reset(const struct device* dev){
 
 	spi_cmd(dev, SPI_NAND_RESET, NULL, 0);
 	
-	//spi_nor_rdsr(dev);
+	//spi_rdsr(dev);
 
 	return 0;
 }
@@ -437,7 +437,7 @@ int set_features(const struct device* dev, uint8_t register_select, uint8_t data
  * @param dev The device structure
  * @return 0 on success, negative errno code otherwise
  */
-int spi_nor_wait_until_ready(const struct device *dev)
+int spi_flash_wait_until_ready(const struct device *dev)
 {
 	int waitcycles = 0;
 	int ret = 0;
@@ -498,7 +498,7 @@ static void release_device(const struct device *dev)
  *
  * @return the non-negative value of the status register, or an error code.
  */
-uint8_t spi_nor_rdsr(const struct device *dev)
+uint8_t spi_rdsr(const struct device *dev)
 {
 	uint8_t status = get_status(dev);
 	
@@ -522,7 +522,7 @@ int spi_nor_wrsr(const struct device *dev,
 			uint8_t sr)
 {	
 	int ret = set_features(dev, REGISTER_STATUS, sr);
-	spi_nor_wait_until_ready(dev);
+	spi_flash_wait_until_ready(dev);
 	
 
 	return ret;
@@ -582,14 +582,14 @@ int detect_bad_blocks(const struct device* dev){
 		LOG_WRN("read transfer error: %x", res);
 		continue;
 	}
-	spi_nor_wait_until_ready(dev);
+	spi_flash_wait_until_ready(dev);
 
 	res = spi_nor_access(dev, &cread_cinstr_cfg);
 	if (res != 0) {
 		LOG_WRN("buffer transfer error: %x", res);
 		continue;
 	}
-	uint8_t status = spi_nor_rdsr(dev);
+	uint8_t status = spi_rdsr(dev);
 	if (status != 0){
 	LOG_WRN("finished read! with status %i", status);
 	}
@@ -656,7 +656,7 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 		LOG_WRN("read transfer error: %x", res);
 		goto out;
 	}
-	spi_nor_wait_until_ready(dev);
+	spi_flash_wait_until_ready(dev);
 
 	res = spi_nor_access(dev, &cread_cinstr_cfg);
 	if (res != 0) {
@@ -665,7 +665,7 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 	}
 
 out:
-	uint8_t status = spi_nor_rdsr(dev);
+	uint8_t status = spi_rdsr(dev);
 	LOG_DBG("finished read! with status %i", status);
 	release_device(dev);
 	return 0;
@@ -741,9 +741,9 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 		return res;
 	}
 	// wait for operation to finish, issue the get feature command.
-	spi_nor_wait_until_ready(dev);
+	spi_flash_wait_until_ready(dev);
 	//k_sleep()
-	uint8_t status = spi_nor_rdsr(dev);
+	uint8_t status = spi_rdsr(dev);
 	write_disable(dev);
 	release_device(dev);
 	
@@ -800,7 +800,7 @@ static int spi_nand_write(const struct device *dev, off_t addr,
 			src = (const uint8_t *)src + to_write;
 			addr += to_write;
 
-			spi_nor_wait_until_ready(dev);
+			spi_flash_wait_until_ready(dev);
 		}
 	}
 
@@ -834,8 +834,8 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 	
 
 	spi_nor_access(dev, &erase);
-	spi_nor_wait_until_ready(dev);
-	int status = spi_nor_rdsr(dev);
+	spi_flash_wait_until_ready(dev);
+	int status = spi_rdsr(dev);
 	if (status != 0){
 	LOG_WRN("erase completed with status %i", status);
 	}
@@ -851,7 +851,7 @@ int spi_nand_chip_erase(const struct device* device) {
 	
 
 	//set_die(device, 0);
-	size_t size = dev_flash_size(device);
+	size_t size = dev_flash_size(device) / 2;
 	off_t block_address;
 	int status = -1;
 	int page_size = dev_page_size(device);
@@ -870,6 +870,17 @@ int spi_nand_chip_erase(const struct device* device) {
 	}
 	LOG_INF("chip erase complete! with status, %i", status); 
 	return status;
+}
+
+
+int spi_nand_whole_chip_erase(const struct device* dev){
+	
+	set_die(dev, 0);
+	spi_nand_chip_erase(dev);
+	set_die(dev, 1);
+	spi_nand_chip_erase(dev);
+	set_die(dev, 0);
+
 }
 
 
@@ -942,7 +953,7 @@ static int spi_nand_erase(const struct device *dev, off_t addr, size_t size)
 		 */
 		volatile int xcc_ret =
 #endif
-		spi_nor_wait_until_ready(dev);
+		spi_flash_wait_until_ready(dev);
 	}
 
 	int ret2 = spi_nor_write_protection_set(dev, true);
@@ -996,7 +1007,7 @@ static int spi_nor_sfdp_read(const struct device *dev, off_t addr,
 
 #endif /* CONFIG_FLASH_JESD216_API || CONFIG_SPI_NOR_SFDP_RUNTIME */
 
-static int spi_nor_read_jedec_id(const struct device *dev,
+static int spi_read_jedec_id(const struct device *dev,
 				 uint8_t *id)
 {
 	if (id == NULL) {
@@ -1117,7 +1128,7 @@ static int spi_configure(const struct device *dev)
 	 * connectivity by reading the JEDEC ID.
 	 */
 
-	rc = spi_nor_read_jedec_id(dev, jedec_id);
+	rc = spi_read_jedec_id(dev, jedec_id);
 	if (rc != 0) {
 		LOG_ERR("JEDEC ID read failed: %d", rc);
 		return -ENODEV;
@@ -1147,9 +1158,9 @@ static int spi_configure(const struct device *dev)
 	 */
 	acquire_device(dev);
 	reset(dev);
-	spi_nor_wait_until_ready(dev);
+	spi_flash_wait_until_ready(dev);
 	spi_unlock_memory(dev);
-	uint8_t status = spi_nor_rdsr(dev);
+	uint8_t status = spi_rdsr(dev);
 	uint8_t configuration = get_features(dev, REGISTER_CONFIGURATION);
 	uint8_t blocklock = get_features(dev, REGISTER_BLOCKLOCK);
 	LOG_INF("status register: %d", status);
@@ -1161,7 +1172,7 @@ static int spi_configure(const struct device *dev)
 	if (cfg->has_lock != 0) {
 		acquire_device(dev);
 
-		uint8_t status = spi_nor_rdsr(dev);
+		uint8_t status = spi_rdsr(dev);
 		LOG_INF("Status Register: %d", status);
 		if (rc > 0) {
 			//rc = spi_nor_wrsr(dev, rc & ~cfg->has_lock);
