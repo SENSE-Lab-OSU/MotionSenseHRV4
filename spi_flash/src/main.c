@@ -41,13 +41,13 @@ int storage_main(void);
 void main(void){
 	printf("Start\n");
 	k_sleep(K_SECONDS(2));
-	main2(true);
+	main2(true, true);
 	k_sleep(K_SECONDS(2));
-	storage_main();
+	//storage_main();
 	
 } 
 
-void main2(bool chip_erase)
+void main2(bool chip_erase, bool write)
 {
 	//test_cmd();
 	
@@ -119,9 +119,9 @@ void main2(bool chip_erase)
 	const char* disk_name = "SD";
 	
 	
-	/*for (int x = 25; x < 65; x++){
+	for (int x = 65; x < 95; x++){
 	disk_access_write(disk_name, expected, x, 1);
-	}*/
+	}
 	
 	
 	
@@ -135,7 +135,7 @@ void main2(bool chip_erase)
 	// 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
 
 	memset(buf, 0, len);
-	rc = disk_access_read(disk_name, buf, 30, 1);
+	rc = disk_access_read(disk_name, buf, 90, 1);
 	//rc = spi_nand_page_read(flash_dev, 4, buf); 
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {

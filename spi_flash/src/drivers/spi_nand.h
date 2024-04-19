@@ -254,7 +254,7 @@ int spi_flash_wait_until_ready(const struct device *dev);
 
 off_t convert_to_address(uint32_t page, uint32_t block);
 
-off_t convert_page_to_address(uint32_t page);
+off_t convert_page_to_address(const struct device* dev, uint32_t page);
 
 off_t convert_block_to_address(uint32_t block);
 

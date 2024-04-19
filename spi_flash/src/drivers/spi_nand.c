@@ -1067,7 +1067,7 @@ static int spi_read_jedec_id(const struct device *dev,
  * @retval 0 if the device is successfully left in 24-bit mode or
  *         reconfigured to 32-bit mode.
  */
-static int spi_nor_set_address_mode(const struct device *dev,
+static int spi_nor_set_address_mode(const struct device* dev,
 				    uint8_t enter_4byte_addr)
 {
 	int ret = 0;

@@ -149,7 +149,7 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 	int ret = 0;
 	
 	for (int x = 0; x < count; x++) {
-	addr = convert_page_to_address(sector);
+	addr = convert_page_to_address(dev, sector);
 	ret = spi_nand_page_read(dev, addr, buf);
 	}
 	
@@ -180,7 +180,7 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 	}
 
 	for (int x = 0; x < count; x++){
-		addr = convert_page_to_address(sector+x);
+		addr = convert_page_to_address(dev, sector+x);
 		ret = spi_nand_page_write(dev, addr, buf, 4096);
 		
 	}
