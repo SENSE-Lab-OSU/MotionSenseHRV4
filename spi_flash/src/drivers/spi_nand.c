@@ -25,7 +25,7 @@
 #include "jesd216.h"
 #include "flash_priv.h"
 
-
+int erase_file_table();
 
 LOG_MODULE_REGISTER(spi_nand, CONFIG_FLASH_LOG_LEVEL);
 
@@ -86,6 +86,9 @@ static const struct jesd216_erase_type minimal_erase_types[JESD216_NUM_ERASE_TYP
 int current_writes = 0;
 int current_reads = 0;
 int current_erases = 0;
+
+
+int current_die = 0;
 
 
 static int spi_nor_write_protection_set(const struct device *dev,
@@ -205,8 +208,23 @@ off_t convert_to_address(uint32_t page, uint32_t block){
 	return page + (block * 64);
 }
 
-off_t convert_page_to_address(uint32_t page){
-	return page;
+
+// 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
+off_t convert_page_to_address(const struct device* dev, uint32_t page){
+
+
+	if (page < 131072){
+		if (current_die == 1){
+			set_die(dev, 0);
+		}
+		return page;
+	}
+	else {
+		if (current_die == 0){
+			set_die(dev, 1);
+		}
+		return page - 131072;
+	}
 
 }
 
@@ -359,8 +377,14 @@ int set_die(const struct device* dev, int die_select){
     if (die_select == 1) {
 		feature = 0x40;
 	}
-	set_features(dev, REGISTER_DIESELECT, feature);
-
+	int ret = set_features(dev, REGISTER_DIESELECT, feature);
+	if (ret == 0){
+		current_die = die_select;
+	}
+	else{
+		LOG_WRN("error with die setting");
+	}
+	return ret;
 }
 
 
@@ -851,10 +875,12 @@ int spi_nand_chip_erase(const struct device* device) {
 	
 
 	//set_die(device, 0);
+	// Get the total size in bytes of the flash, and divide by 2 because there are 2 die
 	size_t size = dev_flash_size(device) / 2;
 	off_t block_address;
 	int status = -1;
 	int page_size = dev_page_size(device);
+	//Divide by page size to get the total pages, then by pages per block to get block size
 	int block_count = (size / page_size);
 	block_count /= 64;
 	block_count--;
@@ -880,6 +906,7 @@ int spi_nand_whole_chip_erase(const struct device* dev){
 	set_die(dev, 1);
 	spi_nand_chip_erase(dev);
 	set_die(dev, 0);
+	erase_file_table();
 
 }
 

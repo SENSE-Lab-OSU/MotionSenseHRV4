@@ -9,9 +9,11 @@
  */
 
 #include <zephyr/device.h>
-#include <zephyr/drivers/disk.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/storage/flash_map.h>
+#include <zephyr/storage/disk_access.h>
 #include "spi_nand.h"
 #include "nand_disk.h"
 
@@ -41,7 +43,17 @@ int sector_write_list[5000] = { 0 };
 int unique_sectors_written = 0;
 
 char sector_buffer[40][4096];
-int file_table_sector_num = 40;
+int file_table_sector_num = 50;
+
+#define FILE_TABLE_NAND_PARTITION	slot1_partition
+
+
+#define FILETABLE_PARTITION_OFFSET	FIXED_PARTITION_OFFSET(FILE_TABLE_NAND_PARTITION)
+#define FILETABLE_PARTITION_DEVICE	FIXED_PARTITION_DEVICE(FILE_TABLE_NAND_PARTITION)
+
+
+
+/* We will need to make this all be enabled by a KConfig. */
 
 static int duplicate_sector_access(int sector_num){
 	for (int i = 0; i < unique_sectors_written; i++){
@@ -53,6 +65,28 @@ static int duplicate_sector_access(int sector_num){
 	sector_write_list[unique_sectors_written] = sector_num;
 	unique_sectors_written++;
 	return 0;
+}
+
+
+int erase_file_table(){
+	const struct device* soc_flash = FILETABLE_PARTITION_DEVICE;
+	flash_erase(soc_flash, FILETABLE_PARTITION_OFFSET, 4096*file_table_sector_num);
+}
+
+static int file_table_access (void* buf, int sector_num, bool write){
+	
+	int ret;
+	const struct device* soc_flash = FILETABLE_PARTITION_DEVICE;
+	struct flash_pages_info* page_info_ptr;
+	off_t address = FILETABLE_PARTITION_OFFSET + (4096*sector_num);
+	flash_get_page_info_by_offs(soc_flash, address, page_info_ptr);
+	if (write){
+		ret = flash_write(soc_flash, address, buf, 4096);	
+	}
+	else {
+		ret = flash_read(soc_flash, address, buf, 4096);
+	}
+	return ret;
 }
 
 
@@ -94,13 +128,14 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 				 uint32_t sector, uint32_t count)
 {
 
-
+	
 	LOG_DBG("performing disk read at sector %i", sector);
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 	
 	if (sector < file_table_sector_num){
-		memcpy(buf, sector_buffer[sector], 4096);
+		//memcpy(buf, sector_buffer[sector], 4096);
+		file_table_access(buf, sector, false);
 		return 0;
 	}
 	
@@ -136,7 +171,8 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 	
 	// Do we know what count means?
 	if (sector < file_table_sector_num){
-		memcpy(sector_buffer[sector], buf, 4096);
+		//memcpy(sector_buffer[sector], buf, 4096);
+		file_table_access(buf, sector, true);
 		return 0;
 	}
 	else {
@@ -198,7 +234,6 @@ struct disk_info sdmmc_disk = {
 
 #define CONFIG_SPI_FLASH_LAYOUT_PAGE_SIZE 4096
 
-#define LAYOUT_PAGES_COUNT 1000
 
 BUILD_ASSERT(DT_INST_NODE_HAS_PROP(0, size),
 	     "jedec,spi-nor size required for non-runtime SFDP page layout");
