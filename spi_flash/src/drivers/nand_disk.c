@@ -39,10 +39,10 @@ struct sdmmc_data {
 
 
 // Config sector monitoring
-int sector_write_list[5000] = { 0 };
+int sector_write_list[20000] = { 0 };
 int unique_sectors_written = 0;
 
-char sector_buffer[40][4096];
+char sector_buffer[20][4096];
 int file_table_sector_num = 50;
 
 #define FILE_TABLE_NAND_PARTITION	slot1_partition
@@ -68,19 +68,20 @@ static int duplicate_sector_access(int sector_num){
 }
 
 
-int erase_file_table(){
+int erase_file_table() {
 	const struct device* soc_flash = FILETABLE_PARTITION_DEVICE;
 	flash_erase(soc_flash, FILETABLE_PARTITION_OFFSET, 4096*file_table_sector_num);
 }
 
-static int file_table_access (void* buf, int sector_num, bool write){
+static int file_table_access(void* buf, int sector_num, bool write){
 	
 	int ret;
 	const struct device* soc_flash = FILETABLE_PARTITION_DEVICE;
 	struct flash_pages_info* page_info_ptr;
 	off_t address = FILETABLE_PARTITION_OFFSET + (4096*sector_num);
-	flash_get_page_info_by_offs(soc_flash, address, page_info_ptr);
+	//flash_get_page_info_by_offs(soc_flash, address, page_info_ptr);
 	if (write){
+		ret = flash_erase(soc_flash, address, 4096);
 		ret = flash_write(soc_flash, address, buf, 4096);	
 	}
 	else {
@@ -104,7 +105,7 @@ static int disk_acess_init2(struct disk_info *disk){
 
 static int disk_nand_access_status(struct disk_info *disk)
 {
-	LOG_INF("Accessing Status");
+	//LOG_INF("Accessing Status");
 	const struct device* dev = disk->dev;
 	
 	/*const struct sdmmc_config* cfg = dev->config;

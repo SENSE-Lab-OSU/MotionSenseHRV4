@@ -11,6 +11,9 @@
 #include <zephyr/fs/fs.h>
 #include <zephyr/random/rand32.h>
 #include <stdio.h>
+#include <zephyr/usb/usb_device.h>
+#include <zephyr/usb/class/usbd_msc.h>
+#include <zephyr/usb/usbd.h>
 
 LOG_MODULE_REGISTER(file_mount, 4);
 
@@ -186,13 +189,11 @@ static int mount_app_fs(struct fs_mount_t *mnt)
 	mnt->fs_data = &fat_fs;
 	if (IS_ENABLED(CONFIG_DISK_DRIVER_RAM)) {
 		mnt->mnt_point = "/RAM:";
-	} else if (IS_ENABLED(CONFIG_DISK_DRIVER_SDMMC)) {
+	} else if (IS_ENABLED(CONFIG_DISK_DRIVER_SDMMC) | IS_ENABLED(CONFIG_DISK_DRIVER_RAW_NAND)) {
 		mnt->mnt_point = "/SD:";
 	} else {
 		mnt->mnt_point = "/NAND:";
 	}
-	mnt->mnt_point = "/SD:";
-	//mnt->storage_dev = "REM";
 	
 #elif CONFIG_FILE_SYSTEM_LITTLEFS
 	mnt->type = FS_LITTLEFS;
@@ -248,10 +249,13 @@ static void setup_disk(void)
 	strcat(folder_location, "/ac");
 	fs_mkdir(folder_location);
 	printk("folder created, now creating files");
-	for (int x = 0; x < 50; x++){
+	
+	/*for (int x = 0; x < 10; x++){
 		create_test_files();
-	//k_sleep(K_SECONDS(.1));
+		k_sleep(K_SECONDS(.25));
 	}
+	*/
+	k_sleep(K_SECONDS(2));
 	
 	rc = fs_statvfs(mp->mnt_point, &sbuf);
 	if (rc < 0) {
@@ -319,5 +323,5 @@ int storage_main(void)
 	}
 	LOG_INF("USB is in Mass storage mode");
 
-	
+	return 0;
 }

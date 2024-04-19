@@ -5,9 +5,34 @@
  */
 
 
+
+ /delete-node/ &storage_partition;
+
+&mx25r64 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		storage_partition: partition@0 {
+			label = "storage";
+			reg = <0x00000000 0x00020000>;
+		};
+	};
+};
+
+/ {
+	msc_disk0 {
+		compatible = "zephyr,flash-disk";
+		partition = <&storage_partition>;
+		disk-name = "NAND";
+		cache-size = <4096>;
+	};
+};
+
  / {
 aliases {
-	spi-flash0 = &mt29;
+	//spi-flash0 = &mt29;
 };
  };
 
@@ -30,6 +55,8 @@ aliases {
 
 };
 
+
+/* 
 &spi2 {
 	status = "okay";
 	pinctrl-0 = < &spi_flash_default>;
@@ -47,7 +74,7 @@ aliases {
 
 };
 
-
+*/
 /* 
 &qspi {
 	status = "okay";

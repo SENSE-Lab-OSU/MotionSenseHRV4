@@ -10,13 +10,12 @@
 #include <zephyr/storage/disk_access.h>
 #include "drivers/nand_disk.h"
 #include "drivers/spi_nand.h"
-#include <zephyr/drivers/spi.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
-
-#include <zephyr/drivers/flash/nrf_qspi_nor.h>
+#include <zephyr/drivers/gpio.h>
 #include <stdio.h>
 #include <string.h>
+
 void test_cmd();
 
 #if defined(CONFIG_BOARD_ADAFRUIT_FEATHER_STM32F405)
@@ -34,6 +33,10 @@ void test_cmd();
 #endif
 #define SPI_FLASH_SECTOR_SIZE        4096
 
+#define LED0_NODE DT_ALIAS(led0)
+#define LED_PIN DT_GPIO_PIN(LED0_NODE, gpios)
+#define LED_FLAGS DT_GPIO_FLAGS(LED0_NODE, gpios)
+
 uint8_t expected[4096];
 
 int storage_main(void);
@@ -41,9 +44,12 @@ int storage_main(void);
 void main(void){
 	printf("Start\n");
 	k_sleep(K_SECONDS(2));
-	main2(true, true);
+	//main2(false, false);
 	k_sleep(K_SECONDS(2));
-	//storage_main();
+	storage_main();
+	const struct device* gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+	int ret = gpio_pin_configure(gpio_dev, LED_PIN, GPIO_OUTPUT_ACTIVE | LED_FLAGS);
+	ret = gpio_pin_set(gpio_dev, LED_PIN, 1);
 	
 } 
 
@@ -95,7 +101,9 @@ void main2(bool chip_erase, bool write)
 	 * SPI_FLASH_SECTOR_SIZE = flash size
 	 */
 	if (chip_erase){
-	rc = spi_nand_chip_erase(flash_dev);
+	#ifdef CONFIG_DISK_DRIVER_RAW_NAND
+	rc = spi_nand_whole_chip_erase(flash_dev);
+	#endif
 	if (rc != 0) {
 		printf("Flash erase failed! %d\n", rc);
 	} else {
@@ -118,9 +126,10 @@ void main2(bool chip_erase, bool write)
 	
 	const char* disk_name = "SD";
 	
-	
-	for (int x = 65; x < 95; x++){
+	if (write){
+	for (int x = 10; x < 48; x++){
 	disk_access_write(disk_name, expected, x, 1);
+	}
 	}
 	
 	
@@ -135,7 +144,7 @@ void main2(bool chip_erase, bool write)
 	// 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
 
 	memset(buf, 0, len);
-	rc = disk_access_read(disk_name, buf, 90, 1);
+	rc = disk_access_read(disk_name, buf, 47, 1);
 	//rc = spi_nand_page_read(flash_dev, 4, buf); 
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
