@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 
-void test_cmd();
+
 
 #if defined(CONFIG_BOARD_ADAFRUIT_FEATHER_STM32F405)
 #define SPI_FLASH_TEST_REGION_OFFSET 0xf000
@@ -45,11 +45,13 @@ void main(void){
 	printf("Start\n");
 	k_sleep(K_SECONDS(2));
 	//main2(false, false);
-	k_sleep(K_SECONDS(2));
+	//k_sleep(K_SECONDS(2));
 	storage_main();
+
 	const struct device* gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
-	int ret = gpio_pin_configure(gpio_dev, LED_PIN, GPIO_OUTPUT_ACTIVE | LED_FLAGS);
+	int ret = gpio_pin_configure(gpio_dev, LED_PIN, GPIO_OUTPUT_ACTIVE);
 	ret = gpio_pin_set(gpio_dev, LED_PIN, 1);
+    
 	
 } 
 
