@@ -250,11 +250,11 @@ static void setup_disk(void)
 	fs_mkdir(folder_location);
 	printk("folder created, now creating files");
 	
-	/*for (int x = 0; x < 10; x++){
+	for (int x = 0; x < 10; x++){
 		create_test_files();
 		k_sleep(K_SECONDS(.25));
 	}
-	*/
+	
 	k_sleep(K_SECONDS(2));
 	
 	rc = fs_statvfs(mp->mnt_point, &sbuf);
@@ -312,6 +312,7 @@ int storage_main(void)
 
 	setup_disk();
 
+	//k_sleep(K_SECONDS(8));
 #if defined(CONFIG_USB_DEVICE_STACK_NEXT)
 	ret = enable_usb_device_next();
 #else

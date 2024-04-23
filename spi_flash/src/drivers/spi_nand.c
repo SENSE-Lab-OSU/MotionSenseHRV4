@@ -109,7 +109,7 @@ static inline const struct jesd216_erase_type* dev_erase_types(const struct devi
 /* Get the size of the flash device.  Data for runtime, constant for
  * minimal and devicetree.
  */
-static inline uint32_t dev_flash_size(const struct device *dev)
+inline uint32_t dev_flash_size(const struct device *dev)
 {
 #ifdef CONFIG_SPI_NOR_SFDP_RUNTIME
 	const struct spi_nor_data *data = dev->data;

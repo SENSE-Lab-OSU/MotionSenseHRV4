@@ -46,7 +46,8 @@ aliases {
 	cs-gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
 	mt29: mt29f8g01ad@0 {
 		compatible = "senselab,nanddisk";
-		size = <4194304000>;
+		//size = <4194304000>;
+		size = <13107200>;
 		reg = <0>;
 		spi-max-frequency = <8000000>;
 		jedec-id = [ff 2c 47];

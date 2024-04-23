@@ -250,6 +250,8 @@ struct spi_nor_data {
 
 uint16_t dev_page_size(const struct device *dev);
 
+uint32_t dev_flash_size(const struct device* dev);
+
 int spi_flash_wait_until_ready(const struct device *dev);
 
 off_t convert_to_address(uint32_t page, uint32_t block);

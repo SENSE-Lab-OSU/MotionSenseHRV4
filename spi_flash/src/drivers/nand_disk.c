@@ -94,8 +94,9 @@ static int file_table_access(void* buf, int sector_num, bool write){
 static int disk_nand_access_init(struct disk_info *disk)
 {
 	const struct device* dev = disk->dev;
-	int sucess = spi_init(dev);
-	return sucess;
+	erase_file_table();
+	//int sucess = spi_init(dev);
+	return 0;//sucess;
 }
 
 
@@ -105,7 +106,7 @@ static int disk_acess_init2(struct disk_info *disk){
 
 static int disk_nand_access_status(struct disk_info *disk)
 {
-	//LOG_INF("Accessing Status");
+	LOG_INF("Accessing Status");
 	const struct device* dev = disk->dev;
 	
 	/*const struct sdmmc_config* cfg = dev->config;
@@ -198,7 +199,10 @@ static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf
 
     switch (cmd) {
 	case DISK_IOCTL_GET_SECTOR_COUNT:
-		(*(uint32_t *)buf) = 64*2000;
+		uint32_t sectors = dev_flash_size(dev) / dev_page_size(dev);
+		
+		LOG_INF("sectors avalible: %i", sectors);
+		(*(uint32_t *)buf) = sectors;
 		break;
 	case DISK_IOCTL_GET_SECTOR_SIZE:
 		(*(uint32_t *)buf) = dev_page_size(dev); 
@@ -211,7 +215,7 @@ static int disk_nand_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buf
 		 * Note that SD stack does not support enabling caching, so
 		 * cache flush is not required here
 		 */
-		return 0; //spi_nor_wait_until_ready(dev);
+		return 0; //spi_flash_wait_until_ready(dev);
 	default:
 		return -ENOTSUP;
 	}
