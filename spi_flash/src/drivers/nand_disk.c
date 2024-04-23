@@ -94,9 +94,9 @@ static int file_table_access(void* buf, int sector_num, bool write){
 static int disk_nand_access_init(struct disk_info *disk)
 {
 	const struct device* dev = disk->dev;
-	erase_file_table();
-	//int sucess = spi_init(dev);
-	return 0;//sucess;
+	
+	int sucess = spi_init(dev);
+	return 0;
 }
 
 
