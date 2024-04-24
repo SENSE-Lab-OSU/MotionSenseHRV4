@@ -19,7 +19,7 @@
 
 #define DT_DRV_COMPAT senselab_nanddisk
 
-LOG_MODULE_REGISTER(nand_disk, 4);
+LOG_MODULE_REGISTER(nand_disk, 2);
 
 enum sd_status {
 	SD_UNINIT,
@@ -106,7 +106,7 @@ static int disk_acess_init2(struct disk_info *disk){
 
 static int disk_nand_access_status(struct disk_info *disk)
 {
-	LOG_INF("Accessing Status");
+	//LOG_DBG("Accessing Status");
 	const struct device* dev = disk->dev;
 	
 	/*const struct sdmmc_config* cfg = dev->config;
@@ -250,7 +250,7 @@ BUILD_ASSERT(DT_INST_NODE_HAS_PROP(0, size),
 	     "jedec,spi-nor size required for non-runtime SFDP page layout");
 
 
-#define INST_0_BYTES (DT_INST_PROP(0, size) / 8)
+#define INST_0_BYTES (DT_INST_PROP(0, size))
 
 BUILD_ASSERT(SPI_NOR_IS_SECTOR_ALIGNED(CONFIG_SPI_FLASH_LAYOUT_PAGE_SIZE),
 	     "SPI_NOR_FLASH_LAYOUT_PAGE_SIZE must be multiple of 4096");
@@ -285,7 +285,7 @@ static const struct spi_flash_config spi_flash_config_0 =
 #undef LAYOUT_PAGES_COUNT
 #endif 
 
-	.flash_size = DT_INST_PROP(0, size) / 8,
+	.flash_size = DT_INST_PROP(0, size),
 	.jedec_id = DT_INST_PROP(0, jedec_id),
 
 #if DT_INST_NODE_HAS_PROP(0, has_lock)

@@ -18,4 +18,4 @@ properties:
   size:
     type: int
     description: |
-      The size in bits. Set this or size-in-bytes, but not both.
+      The size of the flash in bytes.  

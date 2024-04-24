@@ -44,8 +44,8 @@ int storage_main(void);
 void main(void){
 	printf("Start\n");
 	k_sleep(K_SECONDS(2));
-	//main2(false, false);
-	//k_sleep(K_SECONDS(2));
+	main2(true, false);
+	k_sleep(K_SECONDS(2));
 	storage_main();
 
 	const struct device* gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
@@ -118,10 +118,11 @@ void main2(bool chip_erase, bool write)
 	//		 SPI_FLASH_SECTOR_SIZE);
 	
 
+	// We should seperate this out into different tests.
 	printf("\nTest 2: Flash write\n");
 
 	
-
+	for (int sector_num = 131069; sector_num < 131072; sector_num++){
 	printf("Attempting to write %zu bytes\n", len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	
@@ -129,10 +130,10 @@ void main2(bool chip_erase, bool write)
 	const char* disk_name = "SD";
 	
 	if (write){
-	for (int x = 10; x < 48; x++){
-	disk_access_write(disk_name, expected, x, 1);
+	
+		disk_access_write(disk_name, expected, sector_num, 1);
 	}
-	}
+	
 	
 	
 	
@@ -146,7 +147,7 @@ void main2(bool chip_erase, bool write)
 	// 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
 
 	memset(buf, 0, len);
-	rc = disk_access_read(disk_name, buf, 47, 1);
+	rc = disk_access_read(disk_name, buf, sector_num, 1);
 	//rc = spi_nand_page_read(flash_dev, 4, buf); 
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
@@ -179,4 +180,6 @@ void main2(bool chip_erase, bool write)
 		}
 		
 	}
+
+}
 }

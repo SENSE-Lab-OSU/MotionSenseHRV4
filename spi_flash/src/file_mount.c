@@ -250,9 +250,13 @@ static void setup_disk(void)
 	fs_mkdir(folder_location);
 	printk("folder created, now creating files");
 	
-	for (int x = 0; x < 10; x++){
+	for (int x = 0; x < 100; x++){
 		create_test_files();
-		k_sleep(K_SECONDS(.25));
+		if (x % 20 == 0){
+			printk("file num: %i\n", x);
+		}
+		//k_sleep(K_SECONDS(.1));
+
 	}
 	
 	k_sleep(K_SECONDS(2));
@@ -294,7 +298,7 @@ static void setup_disk(void)
 		       (ent.type == FS_DIR_ENTRY_FILE) ? 'F' : 'D',
 		       ent.size,
 		       ent.name);
-			   k_sleep(K_SECONDS(.1));
+			   
 	}
 	printk("%s: bsize = %lu ; frsize = %lu ;"
 	       " blocks = %lu ; bfree = %lu\n",
