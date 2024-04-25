@@ -73,6 +73,27 @@ int erase_file_table() {
 	flash_erase(soc_flash, FILETABLE_PARTITION_OFFSET, 4096*file_table_sector_num);
 }
 
+char nor_buffer[256];
+static int flash_nor_adjustment_write(const struct device* dev, off_t address, char* buf, size_t size){
+	int ret;
+	
+	int memory_corrections = 0;
+	int cmp;
+	off_t computed_address;
+	for (int nor_page = 0; nor_page <= 4096; nor_page += 256){
+		computed_address = address + nor_page;
+		ret = flash_read(dev, computed_address, nor_buffer, 256);
+		void* adjusted_buf = &buf[nor_page];
+		cmp = memcmp(adjusted_buf, nor_buffer, 256);
+
+		if (cmp != 0) {
+			ret = flash_erase(dev, computed_address, 256);
+			ret = flash_write(dev, computed_address, adjusted_buf, 256);
+		}
+	}
+}
+
+
 static int file_table_access(void* buf, int sector_num, bool write){
 	
 	int ret;
@@ -80,7 +101,9 @@ static int file_table_access(void* buf, int sector_num, bool write){
 	struct flash_pages_info* page_info_ptr;
 	off_t address = FILETABLE_PARTITION_OFFSET + (4096*sector_num);
 	//flash_get_page_info_by_offs(soc_flash, address, page_info_ptr);
+
 	if (write){
+
 		ret = flash_erase(soc_flash, address, 4096);
 		ret = flash_write(soc_flash, address, buf, 4096);	
 	}

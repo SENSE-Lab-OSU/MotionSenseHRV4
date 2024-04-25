@@ -91,6 +91,10 @@ int current_erases = 0;
 int current_die = 0;
 
 
+// parameter for multiple flashes.
+int current_flash = 0;
+
+
 static int spi_nor_write_protection_set(const struct device *dev,
 					bool write_protect);
 
@@ -271,6 +275,13 @@ static int spi_nor_access(const struct device *const dev, spi_send_request* requ
 	const struct spi_flash_config* const driver_cfg = dev->config;
 	struct spi_nor_data *const driver_data = dev->data;
 
+	// get parameters needed for spi_transceive and spi_write
+	struct spi_dt_spec spi_spec = driver_cfg->spi;
+	struct spi_config spi_flash_cfg = spi_spec.config;
+	if (current_flash){
+		gpio_pin_t pin2 = 4;
+		spi_flash_cfg.cs.gpio.pin = pin2;
+	}
 	int ret;
 	
 	uint8_t buf[5] = { 0 };
@@ -302,11 +313,11 @@ static int spi_nor_access(const struct device *const dev, spi_send_request* requ
 	};
 
 	if (request->is_write) {
-		ret = spi_write_dt(&driver_cfg->spi, &tx_set);
+		ret = spi_write(&driver_cfg->spi.bus, &spi_flash_cfg, &tx_set);
 		release_device_inner(dev);
 		return ret;
 	}
-	ret = spi_transceive_dt(&driver_cfg->spi, &tx_set, &rx_set);
+	ret = spi_transceive(&driver_cfg->spi.bus, &spi_flash_cfg, &tx_set, &rx_set);
 	release_device_inner(dev);
 	return ret;
 }
@@ -385,6 +396,12 @@ int set_die(const struct device* dev, int die_select){
 		LOG_WRN("error with die setting");
 	}
 	return ret;
+}
+
+int set_flash(const struct device* dev, int flash_id){
+	const struct spi_flash_config* const driver_cfg = dev->config;
+
+
 }
 
 
