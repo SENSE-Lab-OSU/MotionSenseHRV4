@@ -313,11 +313,11 @@ static int spi_nor_access(const struct device *const dev, spi_send_request* requ
 	};
 
 	if (request->is_write) {
-		ret = spi_write(&driver_cfg->spi.bus, &spi_flash_cfg, &tx_set);
+		ret = spi_write(driver_cfg->spi.bus, &spi_flash_cfg, &tx_set);
 		release_device_inner(dev);
 		return ret;
 	}
-	ret = spi_transceive(&driver_cfg->spi.bus, &spi_flash_cfg, &tx_set, &rx_set);
+	ret = spi_transceive(driver_cfg->spi.bus, &spi_flash_cfg, &tx_set, &rx_set);
 	release_device_inner(dev);
 	return ret;
 }
@@ -400,8 +400,8 @@ int set_die(const struct device* dev, int die_select){
 
 int set_flash(const struct device* dev, int flash_id){
 	const struct spi_flash_config* const driver_cfg = dev->config;
-
-
+	current_flash = flash_id;
+	return 0;
 }
 
 
@@ -1128,7 +1128,28 @@ static int spi_nor_set_address_mode(const struct device* dev,
 	return ret;
 }
 
+static int nand_flash_config(const struct device* dev){
+	
 
+	/* Check for block protect bits that need to be cleared.  This
+	 * information cannot be determined from SFDP content, so the
+	 * devicetree node property must be set correctly for any device
+	 * that powers up with block protect enabled.
+	 */
+	acquire_device(dev);
+	reset(dev);
+	spi_flash_wait_until_ready(dev);
+	spi_unlock_memory(dev);
+	uint8_t status = spi_rdsr(dev);
+	uint8_t configuration = get_features(dev, REGISTER_CONFIGURATION);
+	uint8_t blocklock = get_features(dev, REGISTER_BLOCKLOCK);
+	LOG_INF("status register: %d", status);
+	LOG_INF("Configuration: %i", configuration);
+	LOG_INF("BlockLock: %i", blocklock);
+	release_device(dev);
+	
+
+}
 
 
 /**
@@ -1138,9 +1159,9 @@ static int spi_nor_set_address_mode(const struct device* dev,
  * @param info The flash info structure
  * @return 0 on success, negative errno code otherwise
  */
-static int spi_configure(const struct device *dev)
+static int spi_configure(const struct device *dev, struct spi_flash_config* cfg)
 {
-	const struct spi_flash_config *cfg = dev->config;
+	
 	uint8_t jedec_id[SPI_MAX_ID_LEN];
 	int rc;
 
@@ -1195,23 +1216,12 @@ static int spi_configure(const struct device *dev)
 	}
 #endif
 
-	/* Check for block protect bits that need to be cleared.  This
-	 * information cannot be determined from SFDP content, so the
-	 * devicetree node property must be set correctly for any device
-	 * that powers up with block protect enabled.
-	 */
-	acquire_device(dev);
-	reset(dev);
-	spi_flash_wait_until_ready(dev);
-	spi_unlock_memory(dev);
-	uint8_t status = spi_rdsr(dev);
-	uint8_t configuration = get_features(dev, REGISTER_CONFIGURATION);
-	uint8_t blocklock = get_features(dev, REGISTER_BLOCKLOCK);
-	LOG_INF("status register: %d", status);
-	LOG_INF("Configuration: %i", configuration);
-	LOG_INF("BlockLock: %i", blocklock);
-	release_device(dev);
+	nand_flash_config(dev); 
 	
+
+
+
+
 	/*
 	if (cfg->has_lock != 0) {
 		acquire_device(dev);
@@ -1314,14 +1324,26 @@ static int spi_nor_pm_control(const struct device *dev, enum pm_device_action ac
  */
 int spi_init(const struct device *dev)
 {
+	int ret;
 	if (IS_ENABLED(CONFIG_MULTITHREADING)) {
 		struct spi_nor_data* const driver_data = dev->data;
 
 		k_sem_init(&driver_data->sem, 1, K_SEM_MAX_LIMIT);
 		k_sem_init(&driver_data->sem_inner, 1, K_SEM_MAX_LIMIT);
 	}
-
-	return spi_configure(dev);
+	struct spi_flash_config *cfg = dev->config;
+	// TODO: go through device tree and get multiple config options
+	ret = spi_configure(dev, cfg);
+	if (ret == 0){
+		// Configure the second spi_flash
+		gpio_pin_t second_pin = 4;
+		struct spi_cs_control cs_control = cfg->spi.config.cs;
+		cs_control.gpio.pin = second_pin;
+		set_flash(dev, 1);
+		ret = spi_configure(dev, cfg);
+		set_flash(dev, 0); 
+	}
+	return ret;
 }
 
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)

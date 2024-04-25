@@ -268,6 +268,7 @@ int set_features(const struct device* dev, uint8_t register_select, uint8_t data
 /* Set the Die. if 0, use the first die, if 1, use the second. */
 int set_die(const struct device* dev, int die);
 
+int set_flash(const struct device* dev, int flash_id);
 
 uint8_t spi_rdsr(const struct device *dev);
 

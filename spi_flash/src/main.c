@@ -44,9 +44,9 @@ int storage_main(void);
 void main(void){
 	printf("Start\n");
 	k_sleep(K_SECONDS(2));
-	main2(true, false);
+	main2(false, true);
 	k_sleep(K_SECONDS(2));
-	storage_main();
+	//storage_main();
 
 	const struct device* gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 	int ret = gpio_pin_configure(gpio_dev, LED_PIN, GPIO_OUTPUT_ACTIVE);
@@ -102,9 +102,11 @@ void main2(bool chip_erase, bool write)
 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
 	 * SPI_FLASH_SECTOR_SIZE = flash size
 	 */
+	
 	if (chip_erase){
 	#ifdef CONFIG_DISK_DRIVER_RAW_NAND
 	rc = spi_nand_whole_chip_erase(flash_dev);
+	
 	#endif
 	if (rc != 0) {
 		printf("Flash erase failed! %d\n", rc);
@@ -123,31 +125,29 @@ void main2(bool chip_erase, bool write)
 
 	
 	for (int sector_num = 131069; sector_num < 131072; sector_num++){
-	printf("Attempting to write %zu bytes\n", len);
+		printf("Attempting to write %zu bytes\n", len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
+		
+		
+		const char* disk_name = "SD";
 	
+		if (write){
 	
-	const char* disk_name = "SD";
-	
-	if (write){
-	
-		disk_access_write(disk_name, expected, sector_num, 1);
-	}
-	
-	
-	
-	
+			disk_access_write(disk_name, expected, sector_num, 1);
+		}
 	//rc = disk_api->write(&sdmmc_disk, expected, 4, 0);
 	//rc = spi_nand_page_write(flash_dev, 4, expected, len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 	if (rc != 0) {
 		printf("Flash write failed! %d\n", rc);
 	}
-
+	
 	// 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
 
 	memset(buf, 0, len);
+	//set_flash(flash_dev, 1);
 	rc = disk_access_read(disk_name, buf, sector_num, 1);
+	set_flash(flash_dev, 0);
 	//rc = spi_nand_page_read(flash_dev, 4, buf); 
 	//rc = flash_read(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, buf, len);
 	if (rc != 0) {
