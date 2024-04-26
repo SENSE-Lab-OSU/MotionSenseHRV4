@@ -37,66 +37,15 @@
 #define LED_PIN DT_GPIO_PIN(LED0_NODE, gpios)
 #define LED_FLAGS DT_GPIO_FLAGS(LED0_NODE, gpios)
 
-uint8_t expected[4096];
+int flash_erase_test(const struct device* flash_dev, bool chip_erase){
 
-int storage_main(void);
-
-void main(void){
-	printf("Start\n");
-	k_sleep(K_SECONDS(2));
-	main2(false, true);
-	k_sleep(K_SECONDS(2));
-	//storage_main();
-
-	const struct device* gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
-	int ret = gpio_pin_configure(gpio_dev, LED_PIN, GPIO_OUTPUT_ACTIVE);
-	ret = gpio_pin_set(gpio_dev, LED_PIN, 1);
-    
-	
-} 
-
-void main2(bool chip_erase, bool write)
-{
-	//test_cmd();
-	
-	for (int i = 0; i < sizeof(expected); i++){
-		expected[i] = i % 9;
-	}
-	const size_t len = sizeof(expected);
-	uint8_t buf[sizeof(expected)];
-	const struct device *flash_dev;
-	int rc = 0;
-
-	const struct device* test_qspi_dev = DEVICE_DT_GET(DT_NODELABEL(gpio1));
-	printk("got first device");
-	
-	flash_dev = DEVICE_DT_GET(DT_ALIAS(spi_flash0));
-	const struct device* spi_dev; //= DEVICE_DT_GET(DT_NODELABEL(spi4));
-	spi_dev = device_get_binding("spi@9000");
-	//DEVICE_DT_GET(DT_NODELABEL(spi0));
-
-
-	//flash_dev = NULL;
-	if (!device_is_ready(flash_dev)) {
-		printk("%s: device not ready.\n", flash_dev->name);
-		return;
-	}
-
-
-	const struct disk_operations* disk_api = (const struct disk_operations*)spi_dev->api;
- 
-	printf("\n%s SPI flash testing\n", flash_dev->name);
-	printf("==========================\n");
-	k_sleep(K_MSEC(500));
-
-	
+	int rc;
 	/* Write protection needs to be disabled before each write or
 	 * erase, since the flash component turns on write protection
 	 * automatically after completion of write and erase
 	 * operations.
 	 */
-	printf("\nTest 1: Flash erase\n");
-	k_sleep(K_MSEC(500));
+	
 	
 	//detect_bad_blocks(flash_dev);
 	/* Full flash erase if SPI_FLASH_TEST_REGION_OFFSET = 0 and
@@ -118,12 +67,91 @@ void main2(bool chip_erase, bool write)
 	//rc = spi_nand_block_erase(flash_dev, 65);
 	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
 	//		 SPI_FLASH_SECTOR_SIZE);
-	
 
-	// We should seperate this out into different tests.
-	printf("\nTest 2: Flash write\n");
+	return rc;
+}
+
+
+int flash_simple_read_erased_test(const struct device* flash_dev){
+	int rc;
+
+	return rc;
+}	
+
+int flash_simple_write_read_test(const struct device* flash_dev, bool write){
+	uint8_t expected[4096];
+	int rc;
+	for (int i = 0; i < sizeof(expected); i++){
+		expected[i] = i % 9;
+	}
+	const size_t len = sizeof(expected);
+	uint8_t buf[sizeof(expected)];
+
+
 
 	
+	printf("Attempting to write %zu bytes\n", len);
+				
+		
+	
+		if (write){
+			rc = spi_nand_page_write(flash_dev, 4, expected, len);
+		}
+	
+	if (rc != 0) {
+		printf("Flash write failed! %d\n", rc);
+	}
+	const char* disk_name = "SD";
+	// 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
+
+	memset(buf, 0, len);
+	//set_flash(flash_dev, 1);
+	rc = spi_nand_page_read(flash_dev, 4, buf);
+	if (rc != 0) {
+		printf("Flash read failed! %d\n", rc);
+		return;
+	}
+	bool print_results = true;
+	const uint8_t *wp = expected;
+	const uint8_t *rp = buf;
+	const uint8_t *rpe = rp + 100;
+
+	if (memcmp(expected, buf, len) == 0) {
+		printf("Data read matches data written. Good!!\n");
+		while (rp < rpe && print_results) {
+			printf("%08x wrote %02x read %02x %s\n",
+			       (uint32_t)(SPI_FLASH_TEST_REGION_OFFSET + (rp - buf)),
+			       *wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
+			++rp;
+			++wp;
+		}
+	} else {
+
+		printf("Data read does not match data written!!\n");
+		while (rp < rpe && print_results) {
+			printf("%08x wrote %02x read %02x %s\n",
+			       (uint32_t)(SPI_FLASH_TEST_REGION_OFFSET + (rp - buf)),
+			       *wp, *rp, (*rp == *wp) ? "match" : "MISMATCH");
+			++rp;
+			++wp;
+		}
+		
+	}
+
+
+}
+
+int flash_multi_write_read_test(const struct device* flash_dev, bool write){
+
+	uint8_t expected[4096];
+	for (int i = 0; i < sizeof(expected); i++){
+		expected[i] = i % 9;
+	}
+	const size_t len = sizeof(expected);
+	uint8_t buf[sizeof(expected)];
+	
+	int rc = 0;
+
 	for (int sector_num = 131069; sector_num < 131072; sector_num++){
 		printf("Attempting to write %zu bytes\n", len);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
@@ -181,5 +209,59 @@ void main2(bool chip_erase, bool write)
 		
 	}
 
+	}
+
+
 }
+
+
+int storage_main(void);
+
+void main(void){
+	printf("Start\n");
+	k_sleep(K_SECONDS(2));
+	main2(false, true);
+	k_sleep(K_SECONDS(2));
+	//storage_main();
+
+	const struct device* gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+	int ret = gpio_pin_configure(gpio_dev, LED_PIN, GPIO_OUTPUT_ACTIVE);
+	ret = gpio_pin_set(gpio_dev, LED_PIN, 1);
+    
+	
+} 
+
+void main2(bool chip_erase, bool write)
+{
+	//test_cmd();
+	
+	const struct device *flash_dev;
+	const struct device* test_qspi_dev = DEVICE_DT_GET(DT_NODELABEL(gpio1));
+	printk("got first device");
+	
+	flash_dev = DEVICE_DT_GET(DT_ALIAS(spi_flash0));
+	const struct device* spi_dev; //= DEVICE_DT_GET(DT_NODELABEL(spi4));
+	spi_dev = device_get_binding("spi@9000");
+	
+
+	if (!device_is_ready(flash_dev)) {
+		printk("%s: device not ready.\n", flash_dev->name);
+		return;
+	}
+
+
+	const struct disk_operations* disk_api = (const struct disk_operations*)spi_dev->api;
+ 
+	printf("\n%s SPI flash testing\n", flash_dev->name);
+	printf("==========================\n");
+	k_sleep(K_MSEC(500));
+
+	printf("\nTest 1: Flash erase\n");
+	k_sleep(K_MSEC(500));
+	flash_erase_test(flash_dev, chip_erase);
+	
+
+	printf("\nTest 2: Flash write\n");
+	flash_multi_write_read_test(flash_dev, write);
+
 }

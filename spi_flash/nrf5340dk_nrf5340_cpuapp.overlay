@@ -47,8 +47,9 @@ aliases {
 	mt29: mt29f8g01ad@0 {
 		compatible = "senselab,nanddisk";
 		//size = <4194304000>;
-		// size needs to be in bits
-		size = <1073725440>;
+		// size needs to be in bytes
+		//size = <1073725440>;
+		size = <2147450880>;
 		reg = <0>;
 		spi-max-frequency = <8000000>;
 		jedec-id = [ff 2c 47];

@@ -90,6 +90,9 @@ int current_erases = 0;
 
 int current_die = 0;
 
+// Second die for the second flash.
+int current_die2 = 0;
+
 
 // parameter for multiple flashes.
 int current_flash = 0;
@@ -216,19 +219,35 @@ off_t convert_to_address(uint32_t page, uint32_t block){
 // 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
 off_t convert_page_to_address(const struct device* dev, uint32_t page){
 
-
-	if (page < 131072){
-		if (current_die == 1){
-			set_die(dev, 0);
-		}
-		return page;
+	// total number of sectors per die. 
+	int die_size = 131072;
+	int selected_die_num = die_size / page;
+	LOG_DBG("die/flash  number: %d", selected_die_num);
+	if (page < die_size){
+		
+		set_flash(dev, 0);
+		set_die(dev, 0);
+		
 	}
-	else {
-		if (current_die == 0){
-			set_die(dev, 1);
-		}
-		return page - 131072;
+	else if (page < die_size*2){
+		
+		set_flash(dev, 0);
+		set_die(dev, 1);
+		return page - die_size;
 	}
+	else if (page < die_size*3) {
+		
+		set_flash(dev, 1);
+		set_die(dev, 0);
+		
+	}
+	else if (page < die_size*4){
+		
+		set_flash(dev, 1);
+		set_die(dev, 1);
+		
+	}
+	return page - die_size*selected_die_num;
 
 }
 
@@ -383,20 +402,29 @@ int reset(const struct device* dev){
 }
 
 int set_die(const struct device* dev, int die_select){
-
+	
 	uint8_t feature = 0x0;
     if (die_select == 1) {
 		feature = 0x40;
 	}
 	int ret = set_features(dev, REGISTER_DIESELECT, feature);
 	if (ret == 0){
-		current_die = die_select;
+		if (current_flash){
+			current_die2 = die_select;
+		}
+		else {
+			current_die = die_select;
+		}
 	}
 	else{
 		LOG_WRN("error with die setting");
 	}
 	return ret;
+
 }
+
+
+
 
 int set_flash(const struct device* dev, int flash_id){
 	const struct spi_flash_config* const driver_cfg = dev->config;
@@ -927,6 +955,16 @@ int spi_nand_whole_chip_erase(const struct device* dev){
 
 }
 
+int spi_nand_multi_chip_erase(const struct device* dev){
+
+	set_flash(dev, 0);
+	spi_nand_whole_chip_erase(dev);
+	set_flash(dev, 1);
+	spi_nand_whole_chip_erase(dev);
+	set_flash(dev, 0);
+
+}
+
 
 static int spi_nand_erase(const struct device *dev, off_t addr, size_t size)
 {
@@ -1128,7 +1166,7 @@ static int spi_nor_set_address_mode(const struct device* dev,
 	return ret;
 }
 
-static int nand_flash_config(const struct device* dev){
+static int flash_reset_and_unlock(const struct device* dev){
 	
 
 	/* Check for block protect bits that need to be cleared.  This
@@ -1216,12 +1254,8 @@ static int spi_configure(const struct device *dev, struct spi_flash_config* cfg)
 	}
 #endif
 
-	nand_flash_config(dev); 
+	flash_reset_and_unlock(dev); 
 	
-
-
-
-
 	/*
 	if (cfg->has_lock != 0) {
 		acquire_device(dev);

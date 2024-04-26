@@ -42,8 +42,8 @@ struct sdmmc_data {
 int sector_write_list[20000] = { 0 };
 int unique_sectors_written = 0;
 
-char sector_buffer[20][4096];
-int file_table_sector_num = 50;
+
+int file_table_sector_num = 255;
 
 #define FILE_TABLE_NAND_PARTITION	slot1_partition
 
@@ -67,6 +67,36 @@ static int duplicate_sector_access(int sector_num){
 	return 0;
 }
 
+
+/* handle a duplicate write by rewritting the entire block. Configurable because it will use up a lot of erase write cycles. */
+#ifdef CONFIG_RAW_NAND_ALLOW_PAGE_REWRITE
+int duplicate_writes = 0;
+int duplicate_write_max = 50;
+char sector_buffer[64][4096];
+int rewrite_page(struct disk_info* disk, void* buffer, int sector_num){
+	if (duplicate_writes < duplicate_write_max){
+	// Get the addresses for the starting page of the block and the page relative to the block number
+	int current_page_in_block = sector_num % 64;
+	int block_num = sector_num / 64;
+	int starting_page_number = sector_num - current_page_in_block;
+	// read in the block the page is located in to the buffer
+	disk_access_read(disk, sector_buffer, starting_page_number, 64);
+	spi_nand_block_erase(disk->dev, sector_num);
+
+	// modify the desired buffer with the updated page contents
+	memcpy(sector_buffer[current_page_in_block], buffer, 4096);
+
+	// fill the block back up with the buffer
+	for (int x = starting_page_number; x < starting_page_number + 64; x++){
+		spi_nand_page_write(disk->dev, x, sector_buffer[x], 4096);
+	}
+	duplicate_writes++;
+	}
+	return 0;
+}
+
+
+#endif
 
 int erase_file_table() {
 	const struct device* soc_flash = FILETABLE_PARTITION_DEVICE;
@@ -101,6 +131,12 @@ static int file_table_access(void* buf, int sector_num, bool write){
 	struct flash_pages_info* page_info_ptr;
 	off_t address = FILETABLE_PARTITION_OFFSET + (4096*sector_num);
 	//flash_get_page_info_by_offs(soc_flash, address, page_info_ptr);
+
+	//sector cannot be greater than the allocated file table segment size
+	if (sector_num > file_table_sector_num){
+		LOG_ERR("sector num %d too big for file allocation table", sector_num);
+		return -1;
+	}
 
 	if (write){
 
@@ -164,8 +200,6 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 		return 0;
 	}
 	
-	
-
 	if (count > 1){
 	LOG_WRN("count: %i", count);
 	}
