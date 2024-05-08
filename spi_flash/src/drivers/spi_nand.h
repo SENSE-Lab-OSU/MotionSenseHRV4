@@ -290,6 +290,8 @@ int spi_nand_chip_erase(const struct device* device);
 
 int spi_nand_whole_chip_erase(const struct device* dev);
 
+int spi_nand_multi_chip_erase(const struct device* dev);
+
 int spi_init(const struct device *dev);
 
 #endif /*__SPI_NOR_H__*/

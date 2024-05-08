@@ -137,13 +137,16 @@ void create_test_files(){
 	strcat(destination, "/");
 	//fs_mkdir(destination)
 	strcat(destination, IDString);
-	strcat(destination, "l.txt"); 
+	strcat(destination, "lhuihhuidnwuainduwia.txt"); 
 	
 	int file_create = fs_open(&test_file, destination, FS_O_CREATE | FS_O_WRITE);
 	if (file_create == 0){
-		char a[4000] = "hello world dwuaih i dwhuai hduiw ahudiw ahuid hwuai hduwia hudiwa htf htf htf htfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtf";
-		//printk("trying to write...\n");
+		char a[4096] = "hello world dwuaih i dwhuai hduiw ahudiw ahuid hwuai hduwia hudiwa htf htf htf htfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtf";
+		printk("trying to write file %s...\n", destination);
+		for (int x = 0; x < 128; x++){
 		fs_write(&test_file, a, sizeof(a));
+		//k_sleep(K_MSEC(500));
+		}
 		//printk("done writing\n");
 		fs_close(&test_file);
 	}
@@ -244,20 +247,21 @@ static void setup_disk(void)
 
 	printk("Mount %s: %d\n", fs_mnt.mnt_point, rc);
 
-	char folder_location[12];
+	char folder_location[15];
 	strcat(folder_location, mp->mnt_point);
 	strcat(folder_location, "/ac");
 	fs_mkdir(folder_location);
 	printk("folder created, now creating files");
 	
-	for (int x = 0; x < 100; x++){
+	for (int x = 0; x < 200; x++){
 		create_test_files();
-		if (x % 20 == 0){
+		if (x % 100 == 0){
 			printk("file num: %i\n", x);
 		}
-		//k_sleep(K_SECONDS(.1));
+		
 
 	}
+	
 	
 	k_sleep(K_SECONDS(2));
 	

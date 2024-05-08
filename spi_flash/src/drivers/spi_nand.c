@@ -97,6 +97,9 @@ int current_die2 = 0;
 // parameter for multiple flashes.
 int current_flash = 0;
 
+// TODO: put these in device tree
+const int num_of_flashes = 2;
+const int die_per_flash = 2;
 
 static int spi_nor_write_protection_set(const struct device *dev,
 					bool write_protect);
@@ -129,6 +132,10 @@ inline uint32_t dev_flash_size(const struct device *dev)
 #endif /* CONFIG_SPI_NOR_SFDP_RUNTIME */
 }
 
+inline int dev_die_size(const struct device* dev){
+	return dev_flash_size(dev) / (num_of_flashes*die_per_flash);
+}
+
 /* Get the flash device page size.  Constant for minimal, data for
  * runtime and devicetree.
  */
@@ -139,7 +146,12 @@ inline uint16_t dev_page_size(const struct device *dev)
 #else /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 	const struct spi_nor_data *data = dev->data;
 	uint16_t size = data->page_size;
-	return 4096;
+	if (size == 0){
+		return 4096;
+	}
+	else{
+		return size;
+	}
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 }
 
@@ -215,13 +227,13 @@ off_t convert_to_address(uint32_t page, uint32_t block){
 	return page + (block * 64);
 }
 
-
+// The pages representing a block are from block - 65.
 // 4 gigabit is 536870912 bytes / 4096 = 131072 pages (131071 is last address)
 off_t convert_page_to_address(const struct device* dev, uint32_t page){
 
 	// total number of sectors per die. 
 	int die_size = 131072;
-	int selected_die_num = die_size / page;
+	int selected_die_num = page / die_size;
 	LOG_DBG("die/flash  number: %d", selected_die_num);
 	if (page < die_size){
 		
@@ -233,7 +245,6 @@ off_t convert_page_to_address(const struct device* dev, uint32_t page){
 		
 		set_flash(dev, 0);
 		set_die(dev, 1);
-		return page - die_size;
 	}
 	else if (page < die_size*3) {
 		
@@ -254,6 +265,10 @@ off_t convert_page_to_address(const struct device* dev, uint32_t page){
 off_t convert_block_to_address(uint32_t block){
 	//werid fix because of noticed offsets, perhaps there is another issue we are unaware of.
 	return ((block+1) * 64) + 1;
+}
+
+int convert_block_to_first_page_address(uint32_t block){
+
 }
 
 static void acquire_device_inner(const struct device *dev)
@@ -288,7 +303,7 @@ static void release_device_inner(const struct device *dev)
  * @param length The size of the buffer
  * @return 0 on success, negative errno code otherwise
  */
-static int spi_nor_access(const struct device *const dev, spi_send_request* request)
+static int spi_nand_access(const struct device *const dev, spi_send_request* request)
 {
 	acquire_device_inner(dev);
 	const struct spi_flash_config* const driver_cfg = dev->config;
@@ -331,12 +346,15 @@ static int spi_nor_access(const struct device *const dev, spi_send_request* requ
 		.count = 2,
 	};
 
+	// Perform Desired Spi Operation
 	if (request->is_write) {
 		ret = spi_write(driver_cfg->spi.bus, &spi_flash_cfg, &tx_set);
-		release_device_inner(dev);
-		return ret;
+		
 	}
-	ret = spi_transceive(driver_cfg->spi.bus, &spi_flash_cfg, &tx_set, &rx_set);
+	else {
+		ret = spi_transceive(driver_cfg->spi.bus, &spi_flash_cfg, &tx_set, &rx_set);
+	}
+
 	release_device_inner(dev);
 	return ret;
 }
@@ -347,16 +365,8 @@ static int spi_cmd(const struct device* dev, uint8_t opcode, void* dest, size_t 
 		.data = dest,
 		.data_length = length
 	};
-	return spi_nor_access(dev, &request); 
+	return spi_nand_access(dev, &request); 
 }
-
-#define spi_nor_cmd_addr_read(dev, opcode, addr, dest, length) \
-	spi_nor_access(dev, opcode, NOR_ACCESS_ADDRESSED, addr, dest, length)
-#define spi_nor_cmd_write(dev, opcode) \
-	spi_nor_access(dev, opcode, NOR_ACCESS_WRITE, 0, NULL, 0)
-#define spi_nor_cmd_addr_write(dev, opcode, addr, src, length) \
-	spi_nor_access(dev, opcode, NOR_ACCESS_WRITE | NOR_ACCESS_ADDRESSED, \
-		       addr, (void *)src, length)
 
 
 
@@ -445,7 +455,7 @@ uint8_t get_features(const struct device* dev, uint8_t register_select){
 		.data_length = 1,
 	};
 
-	int res = spi_nor_access(dev, &request);
+	int res = spi_nand_access(dev, &request);
 
 	if (res == 0){
 		return data;
@@ -459,7 +469,7 @@ uint8_t get_features(const struct device* dev, uint8_t register_select){
 // Should only be used to set all features. to only set an induvidual feature, use set_feature 
 int set_features(const struct device* dev, uint8_t register_select, uint8_t data){
 	 
-	LOG_INF("setting features for value: %d", data);
+	//LOG_INF("setting features for value: %d", data);
 	uint8_t data_arr[] = {
 		register_select,
 		data
@@ -474,7 +484,7 @@ int set_features(const struct device* dev, uint8_t register_select, uint8_t data
 		.data_length = 1
 	};
 
-	int res = spi_nor_access(dev, &write_features_request);
+	int res = spi_nand_access(dev, &write_features_request);
 	if (res == 0){
 		uint8_t readback = get_features(dev, register_select);
 	if (readback == data){
@@ -570,8 +580,9 @@ static void release_device(const struct device *dev)
 uint8_t spi_rdsr(const struct device *dev)
 {
 	uint8_t status = get_status(dev);
-	
-	//LOG_DBG("status register: %d", status);
+	if (status > 3){
+	 LOG_WRN("status register: %d", status);
+	}
 	
 	return status;
 }
@@ -607,7 +618,7 @@ int detect_bad_blocks(const struct device* dev){
 	int bad_blocks = 0;
 	uint8_t dest;
 	off_t error_address = 4096;
-	int total_device_size = 3000;//(dev_flash_size(dev) / dev_page_size(dev)) / 64;
+	int total_device_size = (dev_flash_size(dev) / dev_page_size(dev)) / 64;
 	for (int x = 0; x < total_device_size; x++){
 	page_addr = convert_block_to_address(x);
 	acquire_device(dev);
@@ -646,14 +657,14 @@ int detect_bad_blocks(const struct device* dev){
 		.data_length = 1
 	};
 
-	res = spi_nor_access(dev, &pread_cinstr_cfg);
+	res = spi_nand_access(dev, &pread_cinstr_cfg);
 	if (res != 0) {
 		LOG_WRN("read transfer error: %x", res);
 		continue;
 	}
 	spi_flash_wait_until_ready(dev);
 
-	res = spi_nor_access(dev, &cread_cinstr_cfg);
+	res = spi_nand_access(dev, &cread_cinstr_cfg);
 	if (res != 0) {
 		LOG_WRN("buffer transfer error: %x", res);
 		continue;
@@ -720,14 +731,14 @@ int spi_nand_page_read(const struct device* dev, off_t page_addr, void* dest){
 		.data_length = 4096
 	};
 
-	res = spi_nor_access(dev, &pread_cinstr_cfg);
+	res = spi_nand_access(dev, &pread_cinstr_cfg);
 	if (res != 0) {
 		LOG_WRN("read transfer error: %x", res);
 		goto out;
 	}
 	spi_flash_wait_until_ready(dev);
 
-	res = spi_nor_access(dev, &cread_cinstr_cfg);
+	res = spi_nand_access(dev, &cread_cinstr_cfg);
 	if (res != 0) {
 		LOG_WRN("buffer transfer error: %x", res);
 		goto out;
@@ -737,14 +748,14 @@ out:
 	uint8_t status = spi_rdsr(dev);
 	LOG_DBG("finished read! with status %i", status);
 	release_device(dev);
-	return 0;
+	return status;
 }
 
 static int spi_nand_read(const struct device *dev, off_t addr, void *dest,
 			size_t size)
 {
 	
-	const size_t flash_size = dev_flash_size(dev);
+	const size_t flash_size = dev_die_size(dev);
 	int ret;
 
 	/* should be between 0 and flash size */
@@ -792,7 +803,7 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 	};
 	res = write_enable(dev);
 
-	res = spi_nor_access(dev, &pl_cinstr_cfg);
+	res = spi_nand_access(dev, &pl_cinstr_cfg);
 	if (res != 0) {
 		LOG_WRN("load error: %x", res);
 		release_device(dev);
@@ -803,7 +814,7 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 
 	//Start Execute Process
 
-	res = spi_nor_access(dev, &pe_cinstr_cfg);
+	res = spi_nand_access(dev, &pe_cinstr_cfg);
 	if (res != 0){
 		LOG_WRN("lfm_start: %x", res);
 		release_device(dev);
@@ -819,7 +830,7 @@ int spi_nand_page_write(const struct device* dev, off_t page_address, const void
 	LOG_DBG("write completed! with status %i", status);
 	
 	
-	return res;
+	return status;
 
 }
 
@@ -830,7 +841,7 @@ static int spi_nand_write(const struct device *dev, off_t addr,
 			 size_t size)
 {
 	
-	const size_t flash_size = dev_flash_size(dev);
+	const size_t flash_size = dev_die_size(dev);
 	const uint16_t page_size = dev_page_size(dev);
 	int ret = 0;
 
@@ -902,12 +913,9 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 	};
 	
 
-	spi_nor_access(dev, &erase);
+	spi_nand_access(dev, &erase);
 	spi_flash_wait_until_ready(dev);
 	int status = spi_rdsr(dev);
-	if (status != 0){
-	LOG_WRN("erase completed with status %i", status);
-	}
 	write_disable(dev);
 	
 	release_device(dev);
@@ -921,7 +929,7 @@ int spi_nand_chip_erase(const struct device* device) {
 
 	//set_die(device, 0);
 	// Get the total size in bytes of the flash, and divide by 2 because there are 2 die
-	size_t size = dev_flash_size(device) / 2;
+	size_t size = dev_die_size(device);
 	off_t block_address;
 	int status = -1;
 	int page_size = dev_page_size(device);
@@ -946,30 +954,33 @@ int spi_nand_chip_erase(const struct device* device) {
 
 int spi_nand_whole_chip_erase(const struct device* dev){
 	
-	set_die(dev, 0);
-	spi_nand_chip_erase(dev);
-	set_die(dev, 1);
-	spi_nand_chip_erase(dev);
-	set_die(dev, 0);
-	erase_file_table();
-
+	int ret = 0;
+	ret = set_die(dev, 0);
+	ret = spi_nand_chip_erase(dev);
+	ret = set_die(dev, 1);
+	ret = spi_nand_chip_erase(dev);
+	ret = set_die(dev, 0);
+	ret = erase_file_table();
+	return ret;
 }
 
 int spi_nand_multi_chip_erase(const struct device* dev){
 
 	set_flash(dev, 0);
 	spi_nand_whole_chip_erase(dev);
+	LOG_INF("first chip erase complete, starting second...");
+	k_sleep(K_MSEC(500));
 	set_flash(dev, 1);
 	spi_nand_whole_chip_erase(dev);
 	set_flash(dev, 0);
-
+	LOG_INF("all chip erases complete!");
 }
 
 
 static int spi_nand_erase(const struct device *dev, off_t addr, size_t size)
 {
 	current_erases++;
-	const size_t flash_size = dev_flash_size(dev);
+	const size_t flash_size = dev_die_size(dev);
 	int ret = 0;
 
 	/* erase area must be subregion of device */

@@ -38,12 +38,30 @@ struct sdmmc_data {
 };
 
 
+// File System Controls
+bool CheckDuplicateAccess = true;
+bool VerifyWrites = true;
+
+// The current sector offset, caused by the file system having to move data in a different sector due to the prescense of a bad block.
+int total_bad_sectors;
+
+/*perhaps we could make this bad blocks.
+TODO: Make this system calculate this in offline mode.
+Essentially the idea for this is that when we are acessing sectors, we check to see how many bad sectors are below, and that determines the offset to use,
+since bad sectors aren't used and the next sector over is used.
+*/
+uint32_t bad_sectors[80000];
+
 // Config sector monitoring
-int sector_write_list[20000] = { 0 };
+int sector_write_list[5000] = { 0 };
 int unique_sectors_written = 0;
 
 
-int file_table_sector_num = 255;
+int file_table_sector_num = 90;
+
+
+
+
 
 #define FILE_TABLE_NAND_PARTITION	slot1_partition
 
@@ -51,14 +69,35 @@ int file_table_sector_num = 255;
 #define FILETABLE_PARTITION_OFFSET	FIXED_PARTITION_OFFSET(FILE_TABLE_NAND_PARTITION)
 #define FILETABLE_PARTITION_DEVICE	FIXED_PARTITION_DEVICE(FILE_TABLE_NAND_PARTITION)
 
+// eventually we should just change this to blocks.
+static int register_bad_sector(uint32_t sector_num){
+	
+	bad_sectors[total_bad_sectors] = sector_num;
+	total_bad_sectors++;
+}
+
+static int get_sector_offset(int sector_num){
+	
+	for (int x = 0; x < total_bad_sectors; x++){
+		if (bad_sectors[x] <= sector_num){
+			sector_num++;
+		}
+	}
+	return sector_num;
+}
 
 
 /* We will need to make this all be enabled by a KConfig. */
 
-static int duplicate_sector_access(int sector_num){
+static int duplicate_sector_access(struct disk_info* disk, int sector_num){
+	if (unique_sectors_written >= 80000){
+		return 0;
+	}
 	for (int i = 0; i < unique_sectors_written; i++){
 		if (sector_write_list[i] == sector_num){
 			LOG_WRN("error: attempted duplicate write for sector %i", sector_num);
+			// TODO: Determine this offline first.
+			
 			return -1;
 		}
 	}
@@ -67,6 +106,21 @@ static int duplicate_sector_access(int sector_num){
 	return 0;
 }
 
+
+uint8_t check_buffer[4096];
+static int duplicate_sector_access2(const struct disk_info* disk, int sector_num){
+
+	disk_access_read(disk->name, check_buffer, sector_num, 1);
+	for (int x = 0; x < 4096; x++){
+		if (check_buffer[x] != 0xff){
+			LOG_WRN("error: attempted duplicate write for sector %i, total bad %d", sector_num, total_bad_sectors);
+			register_bad_sector(sector_num);
+			return -1;
+			
+		}
+	}
+	return 0;
+}
 
 /* handle a duplicate write by rewritting the entire block. Configurable because it will use up a lot of erase write cycles. */
 #ifdef CONFIG_RAW_NAND_ALLOW_PAGE_REWRITE
@@ -102,6 +156,9 @@ int erase_file_table() {
 	const struct device* soc_flash = FILETABLE_PARTITION_DEVICE;
 	flash_erase(soc_flash, FILETABLE_PARTITION_OFFSET, 4096*file_table_sector_num);
 }
+
+
+
 
 char nor_buffer[256];
 static int flash_nor_adjustment_write(const struct device* dev, off_t address, char* buf, size_t size){
@@ -194,22 +251,25 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
 	
-	if (sector < file_table_sector_num){
-		//memcpy(buf, sector_buffer[sector], 4096);
-		file_table_access(buf, sector, false);
-		return 0;
-	}
 	
+
+	off_t addr;
+	int ret = 0;
+
 	if (count > 1){
 	LOG_WRN("count: %i", count);
 	}
 
-	off_t addr;
-	int ret = 0;
-	
 	for (int x = 0; x < count; x++) {
-	addr = convert_page_to_address(dev, sector);
-	ret = spi_nand_page_read(dev, addr, buf);
+
+		if (sector+x < file_table_sector_num){
+		//memcpy(buf, sector_buffer[sector], 4096);
+		file_table_access(buf, sector+x, false);
+		continue;
+		}
+
+		addr = convert_page_to_address(dev, sector+x);
+		ret = spi_nand_page_read(dev, addr, &buf[x*4096]);
 	}
 	
 	//lol
@@ -221,26 +281,37 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 {
 	LOG_DBG("performing disk write at sector %i", sector);
 	if (count > 1){
-	LOG_WRN("count: %i", count);
+	LOG_INF("count: %i", count);
 	}
 	const struct device *dev = disk->dev;
 	struct sdmmc_data *data = dev->data;
-	int ret;
+	int ret = 0;
 	off_t addr;
 	
-	// Do we know what count means?
-	if (sector < file_table_sector_num){
-		//memcpy(sector_buffer[sector], buf, 4096);
-		file_table_access(buf, sector, true);
-		return 0;
-	}
-	else {
-	duplicate_sector_access(sector);
-	}
 
+
+	
 	for (int x = 0; x < count; x++){
+		// Do we know what count means?
+		if (sector+x < file_table_sector_num){
+			//memcpy(sector_buffer[sector], buf, 4096);
+			file_table_access(buf, sector+x, true);
+			continue;
+		}
+		else {
+		if (CheckDuplicateAccess){
+			duplicate_sector_access2(disk, sector+x);
+		}
+
 		addr = convert_page_to_address(dev, sector+x);
-		ret = spi_nand_page_write(dev, addr, buf, 4096);
+		ret = spi_nand_page_write(dev, addr, &buf[x*4096], 4096);
+		// perhaps a read back here, but we need to do something about a bad sector that is fully erased fine, or a sector that returns a bad ret value.
+		if (ret > 3){
+			//TODO: Implement read back logic here.
+		}
+		}
+
+		
 		
 	}
 	
@@ -393,7 +464,6 @@ static int disk_sdmmc_init(const struct device *dev)
 										\
 
 */
-
 
 	DEVICE_DT_INST_DEFINE(0,						
 			&disk_sdmmc_init,					
