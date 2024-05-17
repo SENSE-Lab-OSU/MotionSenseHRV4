@@ -79,7 +79,7 @@ int flash_erase_test(const struct device* flash_dev, bool chip_erase){
 	return rc;
 }
 
-
+#ifdef CONFIG_DISK_DRIVER_RAW_NAND
 int flash_simple_read_erased_test(const struct device* flash_dev){
 	int rc;
 
@@ -269,7 +269,7 @@ void flash_testing_and_erase(bool chip_erase, bool write)
 	
 	printk("done with all tests!\n");
 }
-
+#endif
 
 void main(void){
 	LOG_INF("Start\n");
@@ -278,9 +278,9 @@ void main(void){
 	ret = gpio_pin_configure(DEVICE_DT_GET(DT_NODELABEL(gpio1)), POWER_PIN, GPIO_OUTPUT_ACTIVE | POWER_FLAGS);
 
 	k_sleep(K_SECONDS(2));
-	flash_testing_and_erase(true, false);
+	//flash_testing_and_erase(true, false);
 	//k_sleep(K_SECONDS(2));
-	//storage_main();
+	storage_main();
 
 	
 	

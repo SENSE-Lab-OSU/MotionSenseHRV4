@@ -4,32 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* 
+ 
 
- /delete-node/ &storage_partition;
-
-&mx25r64 {
-	partitions {
-		compatible = "fixed-partitions";
-		#address-cells = <1>;
-		#size-cells = <1>;
-
-		storage_partition: partition@0 {
-			label = "storage";
-			reg = <0x00000000 0x00020000>;
-		};
-	};
-};
-
-/ {
-	msc_disk0 {
-		compatible = "zephyr,flash-disk";
-		partition = <&storage_partition>;
-		disk-name = "NAND";
-		cache-size = <4096>;
-	};
-};
-*/
  / {
 aliases {
 	spi-flash0 = &mt29;
@@ -43,6 +19,13 @@ aliases {
 
 &spi4 {
 	status = "disabled";
+};
+
+
+&zephyr_udc0 {
+	cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+	};
 };
 
 
@@ -103,10 +86,11 @@ aliases {
 };
 
 &gpio_fwd {
-	status = "disabled";
+	status = "okay";
 };
 
 /* End dev kit trim section */
+
 
  
 &spi2 {
@@ -130,25 +114,32 @@ aliases {
 };
 
 
-/* 
-&spi2 {
-	status = "okay";
+&spi4 {
+	status = "disabled";
 	pinctrl-0 = < &spi_flash_default>;
 	pinctrl-1 = <&spi_flash_sleep>;
 	pinctrl-names = "default", "sleep";
-	cs-gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
-	mt292: mt29f8g01ad@0 {
-		compatible = "senselab,nanddisk";
-		size = <4194304000>;
+	cs-gpios = <&gpio0 18 GPIO_ACTIVE_LOW>, <&gpio0 4 GPIO_ACTIVE_LOW>;
+	mx66u: mx66u2g45g@0 {
+		compatible = "jedec,spi-nor";
+		//size = <4194304000>;
+		// size needs to be in bytes
+		//size = <1073725440>;
+		size = <2147450880>;
 		reg = <0>;
 		spi-max-frequency = <8000000>;
-		jedec-id = [ff 2c 47];
-		status = "okay";
+		jedec-id = [c2 25 3c];
+		status = "disabled";
 	};
 
 };
 
-*/
+
+&qspi {
+	status = "disabled";
+};
+
+
 /* 
 &qspi {
 	status = "okay";
@@ -254,3 +245,28 @@ spi1_sleep: spi1_sleep {
 };
 
  */
+
+ 
+ /delete-node/ &storage_partition;
+
+&mx66u {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		storage_partition: partition@0 {
+			label = "storage";
+			reg = <0x00000000 0x000600000>;
+		};
+	};
+};
+
+/ {
+	msc_disk0 {
+		compatible = "zephyr,flash-disk";
+		partition = <&storage_partition>;
+		disk-name = "SD";
+		cache-size = <4096>;
+	};
+};
