@@ -59,7 +59,7 @@ int unique_sectors_written = 0;
 
 int file_table_sector_num = 90;
 
-
+bool read_only = false;
 
 
 #define FILE_TABLE_NAND_PARTITION	slot0_partition
@@ -212,6 +212,9 @@ static int file_table_access(void* buf, int sector_num, bool write){
 	return ret;
 }
 
+void set_read_only(bool enable){
+	read_only = enable;
+}
 
 static int disk_nand_access_init(struct disk_info *disk)
 {
@@ -244,6 +247,9 @@ static int disk_nand_access_status(struct disk_info *disk)
 	}
 	*/
 	//uint8_t status = spi_rdsr(dev);
+	if (read_only){
+		return DISK_STATUS_WR_PROTECT;
+	}
 	return DISK_STATUS_OK;
 
 }
