@@ -253,7 +253,7 @@ static void setup_disk(void)
 	fs_mkdir(folder_location);
 	printk("folder created, now creating files");
 	
-	for (int x = 0; x < 5; x++){
+	for (int x = 0; x < 300; x++){
 		create_test_files();
 		if (x % 100 == 0){
 			printk("file num: %i\n", x);
@@ -324,7 +324,7 @@ int storage_main(void)
 #if defined(CONFIG_USB_DEVICE_STACK_NEXT)
 	ret = enable_usb_device_next();
 #else
-	ret = usb_enable(NULL);
+	
 #endif
 	if (ret != 0) {
 		LOG_ERR("Failed to enable USB");

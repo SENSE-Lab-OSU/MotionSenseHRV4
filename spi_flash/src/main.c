@@ -15,6 +15,10 @@
 #include <zephyr/drivers/gpio.h>
 #include <stdio.h>
 #include <string.h>
+#include <zephyr/usb/usb_device.h>
+#include <zephyr/usb/class/usbd_msc.h>
+#include <zephyr/usb/usbd.h>
+
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(main, 4);
@@ -276,12 +280,14 @@ void main(void){
 	const struct device* gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 	int ret = gpio_pin_configure(gpio_dev, LED_PIN, GPIO_OUTPUT_ACTIVE |LED_FLAGS);
 	ret = gpio_pin_configure(DEVICE_DT_GET(DT_NODELABEL(gpio1)), POWER_PIN, GPIO_OUTPUT_ACTIVE | POWER_FLAGS);
-
+	
 	k_sleep(K_SECONDS(2));
-	//flash_testing_and_erase(true, false);
+	flash_testing_and_erase(true, false);
+	ret = usb_enable(NULL);
 	//k_sleep(K_SECONDS(2));
 	storage_main();
-
+	usb_disable();
+	usb_enable(NULL);
 	
 	
 	ret = gpio_pin_set(gpio_dev, LED_PIN, 0);

@@ -57,7 +57,7 @@ int sector_write_list[5000] = { 0 };
 int unique_sectors_written = 0;
 
 
-int file_table_sector_num = 90;
+int file_table_sector_num = 60;
 
 bool read_only = false;
 
