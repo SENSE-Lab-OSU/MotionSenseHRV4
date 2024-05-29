@@ -40,7 +40,7 @@ struct sdmmc_data {
 
 
 // File System Controls
-bool CheckDuplicateAccess = true;
+bool CheckDuplicateAccess = false;
 bool VerifyWrites = true;
 
 // The current sector offset, caused by the file system having to move data in a different sector due to the prescense of a bad block.
@@ -278,7 +278,7 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 
 		if (sector+x < file_table_sector_num){
 		//memcpy(buf, sector_buffer[sector], 4096);
-		file_table_access(buf, sector+x, false);
+		ret = file_table_access(buf, sector+x, false);
 		continue;
 		}
 		int non_corrupt_sector = get_sector_offset(sector+x);

@@ -7,7 +7,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-
+#include <ff.h>
 #include <zephyr/fs/fs.h>
 #include <zephyr/random/rand32.h>
 #include <stdio.h>
@@ -140,12 +140,13 @@ void create_test_files(){
 	strcat(destination, "lhuihhuidnwuainduwia.txt"); 
 	
 	int file_create = fs_open(&test_file, destination, FS_O_CREATE | FS_O_WRITE);
+	//FRESULT res = f_expand(test_file.filep, 4096*8, 1);
 	if (file_create == 0){
 		char a[4096] = "hello world dwuaih i dwhuai hduiw ahudiw ahuid hwuai hduwia hudiwa htf htf htf htfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtf";
 		printk("trying to write file %s...\n", destination);
-		for (int x = 0; x < 128; x++){
+		for (int x = 0; x < 16; x++){
 		fs_write(&test_file, a, sizeof(a));
-		//k_sleep(K_MSEC(500));
+		k_sleep(K_MSEC(500));
 		}
 		//printk("done writing\n");
 		fs_close(&test_file);

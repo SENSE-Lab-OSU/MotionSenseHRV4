@@ -425,6 +425,7 @@ int set_die(const struct device* dev, int die_select){
 		else {
 			current_die = die_select;
 		}
+		LOG_DBG("current die %d second flash current die: %d", current_die, current_die2);
 	}
 	else{
 		LOG_WRN("error with die setting");
@@ -898,7 +899,7 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 	acquire_device(dev);
 	current_erases++;
 
-	LOG_DBG("erasing block at %d", block_addr);
+	//LOG_DBG("erasing block at %d", block_addr);
 	write_enable(dev);
 	uint8_t pe_addr_buf[] = {
 	block_addr >> 16,
@@ -944,7 +945,7 @@ int spi_nand_chip_erase(const struct device* device) {
 		status = spi_nand_block_erase(device, block_address);
 		if (status != 0){
 			LOG_WRN("error in chip erase: %i", status);
-			break;
+			continue;
 		}
 	}
 	LOG_INF("chip erase complete! with status, %i", status); 

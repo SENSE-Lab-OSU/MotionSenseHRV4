@@ -165,7 +165,7 @@ void flash_multi_write_read_test(const struct device* flash_dev, bool write, int
 	int rc = 0;
 
 	for (int sector_num = sect_num; sector_num < sect_num + 2; sector_num++){
-		printk("Attempting to write %zu bytes\n", len);
+		printk("Attempting to read/write %zu bytes to %d \n", len, sector_num);
 	//rc = flash_write(flash_dev, SPI_FLASH_TEST_REGION_OFFSET, expected, len);
 		
 		
@@ -262,7 +262,12 @@ void flash_testing_and_erase(bool chip_erase, bool write)
 	
 	
 	flash_multi_write_read_test(flash_dev, write, 0);
+	flash_multi_write_read_test(flash_dev, write, 400);
+	flash_multi_write_read_test(flash_dev, write, 2061);
 	flash_multi_write_read_test(flash_dev, write, 27141);
+	flash_multi_write_read_test(flash_dev, write, 27295);
+	flash_multi_write_read_test(flash_dev, write, 131071);
+	flash_multi_write_read_test(flash_dev, write, 131072);
 	flash_multi_write_read_test(flash_dev, write, 131075*2);
 	flash_multi_write_read_test(flash_dev, write, (131075*3) + 50);
 	
@@ -282,7 +287,7 @@ void main(void){
 	ret = usb_enable(NULL);
 	
 	k_sleep(K_SECONDS(8));
-	storage_main();
+	//storage_main();
 	usb_disable();
 	usb_enable(NULL);
 	
