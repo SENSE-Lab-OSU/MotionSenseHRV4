@@ -75,11 +75,6 @@ int flash_erase_test(const struct device* flash_dev, bool chip_erase){
 		printk("Flash erase succeeded!\n");
 	}
 	}
-	//set_die(flash_dev, 0);
-	//rc = spi_nand_block_erase(flash_dev, 65);
-	//rc = flash_erase(flash_dev, SPI_FLASH_TEST_REGION_OFFSET,
-	//		 SPI_FLASH_SECTOR_SIZE);
-
 	return rc;
 }
 
@@ -283,8 +278,10 @@ void main(void){
 	
 	k_sleep(K_SECONDS(2));
 	flash_testing_and_erase(true, false);
+	
 	ret = usb_enable(NULL);
-	//k_sleep(K_SECONDS(2));
+	
+	k_sleep(K_SECONDS(8));
 	storage_main();
 	usb_disable();
 	usb_enable(NULL);

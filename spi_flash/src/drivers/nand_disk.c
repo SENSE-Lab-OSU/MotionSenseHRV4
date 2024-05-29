@@ -19,7 +19,7 @@
 
 #define DT_DRV_COMPAT senselab_nanddisk
 
-LOG_MODULE_REGISTER(nand_disk, 2);
+LOG_MODULE_REGISTER(nand_disk, 3);
 
 enum sd_status {
 	SD_UNINIT,
@@ -35,6 +35,7 @@ struct sdmmc_data {
 	//struct sd_card card;
 	enum sd_status status;
 	char *name;
+	bool read_for_filename;
 };
 
 
@@ -43,14 +44,14 @@ bool CheckDuplicateAccess = true;
 bool VerifyWrites = true;
 
 // The current sector offset, caused by the file system having to move data in a different sector due to the prescense of a bad block.
-int total_bad_sectors;
+int total_bad_sectors = 0;
 
 /*perhaps we could make this bad blocks.
 TODO: Make this system calculate this in offline mode.
 Essentially the idea for this is that when we are acessing sectors, we check to see how many bad sectors are below, and that determines the offset to use,
 since bad sectors aren't used and the next sector over is used.
 */
-uint32_t bad_sectors[80000];
+uint32_t bad_sectors[20000];
 
 // Config sector monitoring
 int sector_write_list[5000] = { 0 };
@@ -80,6 +81,7 @@ static int register_bad_sector(uint32_t sector_num){
 	
 	bad_sectors[total_bad_sectors] = sector_num;
 	total_bad_sectors++;
+	return total_bad_sectors;
 }
 
 static int get_sector_offset(int sector_num){
@@ -160,7 +162,7 @@ int rewrite_page(struct disk_info* disk, void* buffer, int sector_num){
 
 int erase_file_table() {
 	const struct device* soc_flash = FILETABLE_PARTITION_DEVICE;
-	flash_erase(soc_flash, FILETABLE_PARTITION_OFFSET, 4096*file_table_sector_num);
+	return flash_erase(soc_flash, FILETABLE_PARTITION_OFFSET, 4096*file_table_sector_num);
 }
 
 
@@ -279,8 +281,8 @@ static int disk_nand_access_read(struct disk_info* disk, uint8_t *buf,
 		file_table_access(buf, sector+x, false);
 		continue;
 		}
-
-		addr = convert_page_to_address(dev, sector+x);
+		int non_corrupt_sector = get_sector_offset(sector+x);
+		addr = convert_page_to_address(dev, non_corrupt_sector);
 		ret = spi_nand_page_read(dev, addr, &buf[x*4096]);
 	}
 	
@@ -311,11 +313,21 @@ static int disk_nand_access_write(struct disk_info *disk, const uint8_t *buf,
 			continue;
 		}
 		else {
+		int error;
+		int sector_num = x+sector;
 		if (CheckDuplicateAccess){
-			duplicate_sector_access2(disk, sector+x);
+			for (int y = 0; y < 1000; y++){
+				sector_num = get_sector_offset(x+sector);
+				
+				int error = duplicate_sector_access2(disk, sector_num);
+				if (error == -1){
+					continue;
+				}
+				break;	
+			}
 		}
 
-		addr = convert_page_to_address(dev, sector+x);
+		addr = convert_page_to_address(dev, sector_num);
 		ret = spi_nand_page_write(dev, addr, &buf[x*4096], 4096);
 		// perhaps a read back here, but we need to do something about a bad sector that is fully erased fine, or a sector that returns a bad ret value.
 		if (ret > 3){

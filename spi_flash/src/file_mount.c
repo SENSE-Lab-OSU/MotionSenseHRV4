@@ -253,7 +253,7 @@ static void setup_disk(void)
 	fs_mkdir(folder_location);
 	printk("folder created, now creating files");
 	
-	for (int x = 0; x < 300; x++){
+	for (int x = 0; x < 800; x++){
 		create_test_files();
 		if (x % 100 == 0){
 			printk("file num: %i\n", x);

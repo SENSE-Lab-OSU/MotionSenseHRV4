@@ -960,7 +960,7 @@ int spi_nand_whole_chip_erase(const struct device* dev){
 	ret = set_die(dev, 1);
 	ret = spi_nand_chip_erase(dev);
 	ret = set_die(dev, 0);
-	ret = erase_file_table();
+	
 	return ret;
 }
 
@@ -973,6 +973,7 @@ int spi_nand_multi_chip_erase(const struct device* dev){
 	set_flash(dev, 1);
 	spi_nand_whole_chip_erase(dev);
 	set_flash(dev, 0);
+	erase_file_table();
 	LOG_INF("all chip erases complete!");
 }
 
