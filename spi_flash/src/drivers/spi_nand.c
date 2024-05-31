@@ -264,7 +264,7 @@ off_t convert_page_to_address(const struct device* dev, uint32_t page){
 
 off_t convert_block_to_address(uint32_t block){
 	//werid fix because of noticed offsets, perhaps there is another issue we are unaware of.
-	return ((block+1) * 64) + 1;
+	return ((block) * 64) + 1;
 }
 
 int convert_block_to_first_page_address(uint32_t block){
@@ -918,8 +918,9 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 	spi_flash_wait_until_ready(dev);
 	int status = spi_rdsr(dev);
 	write_disable(dev);
-	
+	LOG_DBG("erase completed! with status %i", status);
 	release_device(dev);
+
 	return status;
 
 }

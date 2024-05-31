@@ -21,7 +21,7 @@
 
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(main, 4);
+LOG_MODULE_REGISTER(main, 3);
 
 #if defined(CONFIG_BOARD_ADAFRUIT_FEATHER_STM32F405)
 #define SPI_FLASH_TEST_REGION_OFFSET 0xf000
@@ -66,8 +66,8 @@ int flash_erase_test(const struct device* flash_dev, bool chip_erase){
 	if (chip_erase){
 	#ifdef CONFIG_DISK_DRIVER_RAW_NAND
 	//rc = spi_nand_whole_chip_erase(flash_dev);
-	rc = spi_nand_multi_chip_erase(flash_dev);
-	
+	//rc = spi_nand_multi_chip_erase(flash_dev);
+	rc = spi_nand_block_erase(flash_dev, 1);
 	#endif
 	if (rc != 0) {
 		printk("Flash erase failed! %d\n", rc);
@@ -261,7 +261,8 @@ void flash_testing_and_erase(bool chip_erase, bool write)
 	//flash_simple_write_read_test(flash_dev, write, true, 27141);
 	
 	
-	flash_multi_write_read_test(flash_dev, write, 0);
+	flash_multi_write_read_test(flash_dev, write, 72);
+	/*
 	flash_multi_write_read_test(flash_dev, write, 400);
 	flash_multi_write_read_test(flash_dev, write, 2061);
 	flash_multi_write_read_test(flash_dev, write, 27141);
@@ -270,7 +271,7 @@ void flash_testing_and_erase(bool chip_erase, bool write)
 	flash_multi_write_read_test(flash_dev, write, 131072);
 	flash_multi_write_read_test(flash_dev, write, 131075*2);
 	flash_multi_write_read_test(flash_dev, write, (131075*3) + 50);
-	
+	*/
 	printk("done with all tests!\n");
 }
 #endif
@@ -280,16 +281,16 @@ void main(void){
 	const struct device* gpio_dev = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 	int ret = gpio_pin_configure(gpio_dev, LED_PIN, GPIO_OUTPUT_ACTIVE |LED_FLAGS);
 	ret = gpio_pin_configure(DEVICE_DT_GET(DT_NODELABEL(gpio1)), POWER_PIN, GPIO_OUTPUT_ACTIVE | POWER_FLAGS);
-	
+	ret = usb_enable(NULL);
 	k_sleep(K_SECONDS(2));
 	flash_testing_and_erase(true, false);
 	
-	ret = usb_enable(NULL);
+	
 	
 	k_sleep(K_SECONDS(8));
 	//storage_main();
-	usb_disable();
-	usb_enable(NULL);
+	//usb_disable();
+	//usb_enable(NULL);
 	
 	
 	ret = gpio_pin_set(gpio_dev, LED_PIN, 0);
