@@ -40,7 +40,7 @@ struct sdmmc_data {
 
 
 // File System Controls
-bool CheckDuplicateAccess = false;
+bool CheckDuplicateAccess = true;
 bool VerifyWrites = true;
 
 // The current sector offset, caused by the file system having to move data in a different sector due to the prescense of a bad block.
@@ -58,7 +58,7 @@ int sector_write_list[5000] = { 0 };
 int unique_sectors_written = 0;
 
 
-int file_table_sector_num = 8;
+int file_table_sector_num = 60;
 
 bool read_only = false;
 

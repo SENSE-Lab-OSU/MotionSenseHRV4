@@ -264,7 +264,7 @@ off_t convert_page_to_address(const struct device* dev, uint32_t page){
 
 off_t convert_block_to_address(uint32_t block){
 	//werid fix because of noticed offsets, perhaps there is another issue we are unaware of.
-	return ((block) * 64) + 1;
+	return (block * 64);
 }
 
 int convert_block_to_first_page_address(uint32_t block){
@@ -909,7 +909,7 @@ int spi_nand_block_erase(const struct device* dev, off_t block_addr){
 	
 	spi_send_request erase = {
 		.opcode = SPI_NOR_CMD_BE,
-		.addr = block_addr,
+		.addr = pe_addr_buf,
 		.addr_length = 3
 	};
 	
@@ -938,10 +938,9 @@ int spi_nand_chip_erase(const struct device* device) {
 	//Divide by page size to get the total pages, then by pages per block to get block size
 	int block_count = (size / page_size);
 	block_count /= 64;
-	block_count--;
 	//block_count = 4096;
 	LOG_INF("chip erase start, for %i blocks", block_count);
-	for (int current_block = 0; current_block < block_count; current_block++){
+	for (int current_block = 0; current_block <= block_count; current_block++){
 		block_address = convert_block_to_address(current_block);
 		status = spi_nand_block_erase(device, block_address);
 		if (status != 0){

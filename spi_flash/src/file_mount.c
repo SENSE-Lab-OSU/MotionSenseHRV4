@@ -140,13 +140,13 @@ void create_test_files(){
 	strcat(destination, "lhuihhuidnwuainduwia.txt"); 
 	
 	int file_create = fs_open(&test_file, destination, FS_O_CREATE | FS_O_WRITE);
-	//FRESULT res = f_expand(test_file.filep, 4096*8, 1);
+	FRESULT res = f_expand(test_file.filep, 4096*128, 0);
 	if (file_create == 0){
 		char a[4096] = "hello world dwuaih i dwhuai hduiw ahudiw ahuid hwuai hduwia hudiwa htf htf htf htfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtfhtf";
 		printk("trying to write file %s...\n", destination);
-		for (int x = 0; x < 16; x++){
+		for (int x = 0; x < 128; x++){
 		fs_write(&test_file, a, sizeof(a));
-		k_sleep(K_MSEC(500));
+		//k_sleep(K_MSEC(500));
 		}
 		//printk("done writing\n");
 		fs_close(&test_file);
@@ -251,10 +251,11 @@ static void setup_disk(void)
 	char folder_location[15];
 	strcat(folder_location, mp->mnt_point);
 	strcat(folder_location, "/ac");
-	fs_mkdir(folder_location);
-	printk("folder created, now creating files");
+	// This works, the behavior is just werid. It writes from sector 50 to 60, presumably for file space.
+	//fs_mkdir(folder_location);
+	//printk("folder created, now creating files");
 	
-	for (int x = 0; x < 800; x++){
+	for (int x = 0; x < 4000; x++){
 		create_test_files();
 		if (x % 100 == 0){
 			printk("file num: %i\n", x);
