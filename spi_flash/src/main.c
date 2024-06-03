@@ -283,11 +283,11 @@ void main(void){
 	ret = gpio_pin_configure(DEVICE_DT_GET(DT_NODELABEL(gpio1)), POWER_PIN, GPIO_OUTPUT_ACTIVE | POWER_FLAGS);
 	ret = usb_enable(NULL);
 	k_sleep(K_SECONDS(2));
-	flash_testing_and_erase(false, false);
+	flash_testing_and_erase(true, false);
 	
 	
 	
-	k_sleep(K_SECONDS(8));
+	k_sleep(K_SECONDS(4));
 	storage_main();
 	usb_disable();
 	usb_enable(NULL);
